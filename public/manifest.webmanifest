@@ -1,0 +1,11 @@
+{
+  "name": "Longhand",
+  "short_name": "Longhand",
+  "description": "A museum the world fills in, one stranger at a time.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#E7E0D2",
+  "theme_color": "#E7E0D2",
+  "icons": []
+}

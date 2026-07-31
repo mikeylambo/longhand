@@ -1,0 +1,379 @@
+:root {
+  --chrome: #e7e0d2;
+  --chrome-2: #ddd5c4;
+  --paper: #f2ede3;
+  --rule: #c9c0ae;
+  --ink: #1b1a17;
+  --muted: #8a8478;
+  --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --sans: ui-sans-serif, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --safe-t: env(safe-area-inset-top, 0px);
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--chrome);
+  color: var(--ink);
+  font-family: var(--sans);
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------------ shell */
+
+.app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--safe-t);
+  padding-bottom: var(--safe-b);
+}
+
+.topbar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px 8px;
+}
+
+.topbar .slot {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.seed {
+  font-family: var(--serif);
+  font-size: 19px;
+  font-style: italic;
+  text-align: center;
+  line-height: 1.1;
+}
+
+.topbar .right {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.linkbtn {
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+}
+
+.linkbtn:disabled {
+  opacity: 0.35;
+}
+
+.linkbtn.solid {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+/* --------------------------------------------------------------- ink meter */
+
+.ink {
+  margin: 0 14px 8px;
+}
+
+.ink-track {
+  height: 3px;
+  background: var(--chrome-2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.ink-fill {
+  height: 100%;
+  background: var(--ink);
+  transform-origin: left center;
+  transition: transform 90ms linear;
+}
+
+.ink-fill.low {
+  background: #a73a34;
+}
+
+.ink-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 5px;
+}
+
+/* ------------------------------------------------------------------ stage */
+
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #d7cfbe;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+
+.lh-surface {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  touch-action: none;
+  cursor: crosshair;
+}
+
+/* The surface canvas is appended to .stage after these, so they need to be
+   lifted above it explicitly. */
+.sidetools,
+.zoomtag,
+.hint {
+  z-index: 2;
+}
+
+.sidetools {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 999px;
+  background: rgba(231, 224, 210, 0.9);
+  border: 1px solid var(--rule);
+  backdrop-filter: blur(6px);
+}
+
+.tool {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+}
+
+.tool:disabled {
+  opacity: 0.28;
+}
+
+.tool.on {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.nib {
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.zoomtag {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  background: rgba(231, 224, 210, 0.85);
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+.hint {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  color: var(--muted);
+  background: rgba(231, 224, 210, 0.9);
+  padding: 6px 12px;
+  border-radius: 999px;
+  pointer-events: none;
+  transition: opacity 500ms ease;
+}
+
+/* ---------------------------------------------------------------- palette */
+
+.palette {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.swatch {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1px solid rgba(27, 26, 23, 0.16);
+}
+
+.swatch.on {
+  box-shadow: 0 0 0 2px var(--chrome), 0 0 0 3.5px var(--ink);
+}
+
+/* Mobile-first; on a wide screen the chrome stays a column and only the sheet
+   goes full-bleed, so the swatches never become dinner plates. */
+@media (min-width: 720px) {
+  .topbar,
+  .ink,
+  .palette {
+    width: 100%;
+    max-width: 620px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+/* ----------------------------------------------------------------- panels */
+
+.panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: calc(var(--safe-t) + 20px) 22px calc(var(--safe-b) + 20px);
+  max-width: 620px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.panel h1 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 30px;
+  margin: 0 0 6px;
+}
+
+.panel p {
+  margin: 0 0 18px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 42ch;
+}
+
+.sigbox {
+  position: relative;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  aspect-ratio: 900 / 340;
+  width: 100%;
+  overflow: hidden;
+}
+
+.sigline {
+  position: absolute;
+  z-index: 1;
+  opacity: 0.7;
+  left: 8%;
+  right: 8%;
+  bottom: 24%;
+  border-bottom: 1px dashed var(--rule);
+  pointer-events: none;
+}
+
+.row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.review-art {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.review-caption {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 14px 0 6px;
+}
+
+.scroll {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.stat {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+/* ------------------------------------------------------------------ tuner */
+
+.tuner {
+  position: fixed;
+  right: 8px;
+  top: calc(var(--safe-t) + 8px);
+  z-index: 10;
+  width: 210px;
+  background: rgba(231, 224, 210, 0.96);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 11px;
+}
+
+.tuner label {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px;
+  margin-bottom: 6px;
+  color: var(--muted);
+}
+
+.tuner input {
+  grid-column: 1 / -1;
+  width: 100%;
+}
