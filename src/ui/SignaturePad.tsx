@@ -8,10 +8,12 @@ import {
   SIGNATURE_WIDTH,
   TUNING,
 } from '../config'
-import { saveSignature } from '../store'
+import type { Stroke } from '../engine/types'
 
 interface Props {
-  onDone: () => void
+  /** Persistence is the session's job — local mode keeps it in the browser,
+   *  ledger mode also writes it to `signatures`. */
+  onDone: (strokes: Stroke[]) => void
 }
 
 /**
@@ -71,8 +73,7 @@ export function SignaturePad({ onDone }: Props) {
           onClick={() => {
             const layer = surfaceRef.current?.getLayer() ?? []
             if (layer.length === 0) return
-            saveSignature(layer)
-            onDone()
+            onDone(layer)
           }}
         >
           This is my mark

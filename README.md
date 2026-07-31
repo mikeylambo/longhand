@@ -2,17 +2,32 @@
 
 *A museum the world fills in, one stranger at a time.*
 
-Milestone 1 of the v1 brief: **the surface**. Drawing works and feels good, and
-every stroke is captured as vectors in the exact shape the ledger will store.
-No backend, no queue, no timer, no accounts.
+Milestones 1 and 2 of the v1 brief: **the surface** and **the ledger**. Drawing
+works and feels good, and every stroke persists as vectors, replays correctly,
+and can be isolated per contributor. No queue, no timer, no accounts.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Dev server binds to `0.0.0.0:5180` on purpose. Milestone 1 is a hand-feel test
-and cannot be judged on a trackpad — open it on a phone on the same wifi.
+Deployed for phone testing at **https://longhand-kappa.vercel.app**.
+
+## Two modes
+
+With no Supabase credentials the app runs **entirely in the browser**: the
+twelve-slot relay is faked locally and nothing is persisted. That keeps a build
+testable for hand-feel work without a database behind it.
+
+Set both env vars and the same UI writes to the real **ledger** instead:
+
+```
+VITE_SUPABASE_URL=
+VITE_SUPABASE_PUBLISHABLE_KEY=
+```
+
+Apply `supabase/migrations/0001_ledger.sql` first. The review screen states
+which mode it ran in, so a test is never ambiguous about whether it saved.
 
 ## What is built
 
@@ -35,15 +50,32 @@ and cannot be judged on a trackpad — open it on a phone on the same wifi.
   path that removes another player's strokes.
 - Undo, scoped to the current turn — see *Judgement calls* below.
 
-**Identity** — a drawn signature, stored locally, no username field anywhere.
+**Identity** — a drawn signature. No username field anywhere, and no way to
+write one.
 
-**The ledger** — strokes are vectors, never pixels. The review screen encodes
-your layer to the wire format, decodes it again, and renders *that*, so any
-loss in the codec shows up immediately instead of two milestones from now.
+**Palette inheritance** — every player after slot 1 gets the colours already on
+the canvas plus two new ones, offset by the canvas id so two canvases drift
+differently. The brief calls this the highest-leverage cohesion mechanic in the
+design and it is live: a slot-1 canvas offers all 16 swatches, and a canvas with
+three colours on it offers five.
 
-**The relay, faked locally** — finishing a turn pushes your layer onto the prior
-stack and hands you the next slot, up to 12. Wrong social model on purpose; it
-exercises the exact rendering path a real twelve-stranger canvas will take.
+**The ledger** (`supabase/migrations/0001_ledger.sql`) — strokes are vectors,
+never pixels. Append-only is enforced by a database trigger, not by application
+politeness: a layer row can only ever change its `hidden` flag, and `DELETE`
+raises. Slot indices are assigned inside `submit_layer` under a row lock, so two
+players can never be handed the same slot. Clients never write to `canvases`,
+`layers` or `turns` directly — RLS grants no such policy, and the two RPCs are
+`security definer`.
+
+The review screen encodes your layer to the wire format, decodes it again, and
+renders *that*, so any loss in the codec shows up immediately instead of two
+milestones from now.
+
+**The timelapse**, rendered from the ledger rather than a video file. Scrub the
+whole canvas filling in, and tap any contributor to isolate or hide their layer
+— which is both the "your layer alone" card and the hide-never-delete moderation
+primitive. The milestone 4 server-side MP4 render is the same walk over the same
+data.
 
 ## Rendering model
 
@@ -86,14 +118,13 @@ In dev the live surface is on `window.__lh` for console work.
 
 ## What Milestone 1 found
 
-**The 4000px ink budget is far too small.** Measured on a 375px-wide phone
+**The 4000px ink budget was far too small.** Measured on a 375px-wide phone
 viewport: a single arc across the sheet consumed **3076 of 4000**. The second
 stroke exhausted the budget and the pen refused to start a third. That is one
-and a half gestures per player — not a contribution, a twitch. Twelve of those
-will not make a picture.
+and a half gestures per player — not a contribution, a twitch.
 
-Recommendation: start around **12,000–16,000** and tune *down* until it bites.
-The number is easy to change; the playtest is not. `?ink=N` to try one.
+Now set to **14,000**, which leaves real headroom (a three-stroke opening layer
+lands around 1,900). Tune it *down* until it bites, against strangers. `?ink=N`.
 
 **A 4:3 landscape sheet wastes about 45% of a portrait phone screen.** At fit,
 the sheet is a band across the middle with dead space above and below. It's
@@ -117,11 +148,18 @@ the broad pen strictly better value per px. Weighting the cost by pen width is
 a one-line change in `StrokeBuilder.add` if playtests show everyone parked on
 the broad nib.
 
+## Unverified
+
+The ledger path is written but has **never run against a live database** — the
+Supabase org is at its free-project limit, so no project exists to migrate into.
+The SQL and the data layer are complete and typechecked; they are not tested.
+Treat `0001_ledger.sql` as unproven until it has been applied once and a layer
+has round-tripped through it.
+
 ## Not built yet
 
-Palette inheritance is a v1 requirement but needs prior-layer colour data from
-the server, so it lands with Milestone 3. Turn timer, slot claiming, accounts,
-notifications, gallery, timelapse — Milestones 3–5, per the brief.
+Turn timer, slot claiming and expiry, auto-routing, accounts, notifications, the
+gallery, the server-side MP4 render — Milestones 3–5, per the brief.
 
-No service worker yet. The manifest is in place; caching strategy is worth
-nothing until there's a backend to be offline from.
+No service worker yet. The manifest is in place; a caching strategy is worth
+nothing until the ledger is real.

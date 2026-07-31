@@ -4,7 +4,6 @@ import type { Stroke } from '../engine/types'
 import {
   CANVAS_H,
   CANVAS_W,
-  MASTER_PALETTE,
   PEN_WIDTHS,
   SHOW_TUNER,
   SLOTS_PER_CANVAS,
@@ -17,11 +16,13 @@ import { Tuner } from './Tuner'
 interface Props {
   seed: string
   slot: number
+  /** Palette inheritance: what's already on the canvas, plus two new colours. */
+  palette: string[]
   priorLayers: Stroke[][]
   onSubmit: (layer: Stroke[]) => void
 }
 
-export function DrawTurn({ seed, slot, priorLayers, onSubmit }: Props) {
+export function DrawTurn({ seed, slot, palette, priorLayers, onSubmit }: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
   const surfaceRef = useRef<Surface | null>(null)
 
@@ -30,7 +31,7 @@ export function DrawTurn({ seed, slot, priorLayers, onSubmit }: Props) {
   const [strokeCount, setStrokeCount] = useState(0)
   const [zoom, setZoom] = useState(1)
   const [fitScale, setFitScale] = useState(1)
-  const [color, setColor] = useState<string>(MASTER_PALETTE[0])
+  const [color, setColor] = useState<string>(palette[0])
   const [size, setSize] = useState(1)
   const [tuning, setTuning] = useState<Tuning>(TUNING)
   const [showHint, setShowHint] = useState(true)
@@ -147,7 +148,7 @@ export function DrawTurn({ seed, slot, priorLayers, onSubmit }: Props) {
       </div>
 
       <div className="palette">
-        {MASTER_PALETTE.map((c) => (
+        {palette.map((c) => (
           <button
             key={c}
             className={`swatch${c === color ? ' on' : ''}`}

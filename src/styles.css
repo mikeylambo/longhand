@@ -348,6 +348,47 @@ button {
   font-size: 12px;
   color: var(--muted);
   letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+
+.panel.center {
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* ----------------------------------------------------------------- replay */
+
+.replay canvas {
+  width: 100%;
+  height: auto;
+}
+
+.scrub {
+  flex: 1;
+  min-width: 120px;
+  accent-color: var(--ink);
+}
+
+.slots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.slotchip {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.slotchip.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
 }
 
 /* ------------------------------------------------------------------ tuner */
