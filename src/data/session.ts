@@ -1,7 +1,13 @@
 import type { Stroke } from '../engine/types'
 import type { ReplayLayer } from '../ui/Replay'
 import { LEDGER_ENABLED } from '../lib/supabase'
-import { MASTER_PALETTE, SLOTS_PER_CANVAS, TURN_MS } from '../config'
+import {
+  CANVAS_H,
+  CANVAS_W,
+  MASTER_PALETTE,
+  SLOTS_PER_CANVAS,
+  TURN_MS,
+} from '../config'
 import { pickSeed, saveSignature } from '../store'
 import {
   cachedSignatureId,
@@ -17,6 +23,9 @@ import {
 export interface CanvasState {
   canvasId: string | null
   seed: string
+  /** The sheet this canvas was opened at, not the current default. */
+  width: number
+  height: number
   /** The slot this player is about to fill, 1-based. */
   slot: number
   /**
@@ -95,6 +104,8 @@ class LocalSession implements Session {
     return {
       canvasId: null,
       seed: this.seed,
+      width: CANVAS_W,
+      height: CANVAS_H,
       slot: Math.min(this.layers.length + 1, SLOTS_PER_CANVAS),
       justFilledSlot,
       priorLayers: this.layers,
@@ -139,6 +150,8 @@ class LedgerSession implements Session {
     return {
       canvasId: canvas.id,
       seed: canvas.seed_word,
+      width: canvas.width ?? CANVAS_W,
+      height: canvas.height ?? CANVAS_H,
       slot: turn.slot_index,
       justFilledSlot: null,
       priorLayers: layers.map((l) => l.strokes),
@@ -163,6 +176,8 @@ class LedgerSession implements Session {
     return {
       canvasId: canvas.id,
       seed: canvas.seed_word,
+      width: canvas.width ?? CANVAS_W,
+      height: canvas.height ?? CANVAS_H,
       slot: Math.min(layers.length + 1, canvas.slot_count),
       justFilledSlot: row.slot_index,
       priorLayers: layers.map((l) => l.strokes),
@@ -200,6 +215,8 @@ export function createSession(): Session {
 /** Used by the shareable canvas page, which has no session and no turn. */
 export async function loadCanvasForViewing(canvasId: string): Promise<{
   seed: string
+  width: number
+  height: number
   closed: boolean
   slotCount: number
   closedAt: string | null
@@ -210,6 +227,8 @@ export async function loadCanvasForViewing(canvasId: string): Promise<{
   const layers = await fetchLayers(canvasId)
   return {
     seed: canvas.seed_word,
+    width: canvas.width ?? CANVAS_W,
+    height: canvas.height ?? CANVAS_H,
     closed: canvas.status === 'closed',
     slotCount: canvas.slot_count,
     closedAt: canvas.closed_at,

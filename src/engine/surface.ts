@@ -530,6 +530,16 @@ export class Surface {
       this.clipped(this.tctx, this.cachedView, (ctx) =>
         drawSegments(ctx, s, this.liveDrawn, s.pts.length),
       )
+      if (import.meta.env.DEV) {
+        // Per-stroke cost, so the ink budget is tuned against measurements
+        // rather than against a guess about what a drawing costs.
+        console.debug(
+          `[ink] stroke ${this.turnStrokes.length}: ${Math.round(s.ink)}px ` +
+            `(${s.pts.length} pts, ${s.color}, w${s.size}) — ` +
+            `${Math.round(this.inkUsed)}/${this.opts.inkBudget} used, ` +
+            `${Math.round(100 - (this.inkUsed / this.opts.inkBudget) * 100)}% left`,
+        )
+      }
     }
     this.liveDrawn = 0
     this.report()

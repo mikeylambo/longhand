@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { renderLayers } from '../engine/render'
-import { CANVAS_H, CANVAS_W, SLOTS_PER_CANVAS } from '../config'
+import { SLOTS_PER_CANVAS } from '../config'
 import { loadCanvasForViewing } from '../data/session'
 import { LEDGER_ENABLED } from '../lib/supabase'
 import { Replay, type ReplayLayer } from './Replay'
@@ -11,6 +11,8 @@ interface Props {
 
 interface Loaded {
   seed: string
+  width: number
+  height: number
   closed: boolean
   slotCount: number
   closedAt: string | null
@@ -55,8 +57,8 @@ export function CanvasPage({ canvasId }: Props) {
     () =>
       state
         ? renderLayers(
-            CANVAS_W,
-            CANVAS_H,
+            state.width,
+            state.height,
             state.layers.map((l) => l.strokes),
             { scale: 1 },
           )
@@ -100,7 +102,11 @@ export function CanvasPage({ canvasId }: Props) {
       </p>
 
       <div className="scroll">
-        <Replay layers={state.layers} />
+        <Replay
+          layers={state.layers}
+          width={state.width}
+          height={state.height}
+        />
 
         <div className="review-caption">Take it with you</div>
         <div className="row">
@@ -135,7 +141,13 @@ export function CanvasPage({ canvasId }: Props) {
         <div className="review-caption">Every hand, alone</div>
         <div className="cards">
           {state.layers.map((l) => (
-            <LayerCard key={l.slotIndex} layer={l} seed={state.seed} />
+            <LayerCard
+              key={l.slotIndex}
+              layer={l}
+              seed={state.seed}
+              width={state.width}
+              height={state.height}
+            />
           ))}
         </div>
       </div>
@@ -154,13 +166,23 @@ export function CanvasPage({ canvasId }: Props) {
 }
 
 /** The personal card: one contributor's layer on bare paper. */
-function LayerCard({ layer, seed }: { layer: ReplayLayer; seed: string }) {
+function LayerCard({
+  layer,
+  seed,
+  width,
+  height,
+}: {
+  layer: ReplayLayer
+  seed: string
+  width: number
+  height: number
+}) {
   const src = useMemo(
     () =>
-      renderLayers(CANVAS_W, CANVAS_H, [layer.strokes], { scale: 0.35 }).toDataURL(
+      renderLayers(width, height, [layer.strokes], { scale: 0.35 }).toDataURL(
         'image/png',
       ),
-    [layer],
+    [layer, width, height],
   )
   return (
     <figure className="card">
@@ -173,7 +195,7 @@ function LayerCard({ layer, seed }: { layer: ReplayLayer; seed: string }) {
           className="linkbtn tiny"
           onClick={() =>
             download(
-              renderLayers(CANVAS_W, CANVAS_H, [layer.strokes], {
+              renderLayers(width, height, [layer.strokes], {
                 scale: 1,
               }).toDataURL('image/png'),
               `longhand-${seed}-slot-${layer.slotIndex}.png`,

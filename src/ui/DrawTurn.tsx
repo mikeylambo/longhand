@@ -2,8 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Surface } from '../engine/surface'
 import type { Stroke } from '../engine/types'
 import {
-  CANVAS_H,
-  CANVAS_W,
   PEN_WIDTHS,
   SHOW_TUNER,
   SLOTS_PER_CANVAS,
@@ -20,6 +18,9 @@ interface Props {
   /** Palette inheritance: what's already on the canvas, plus two new colours. */
   palette: string[]
   priorLayers: Stroke[][]
+  /** The sheet this canvas was opened at, not the current default. */
+  width: number
+  height: number
   /** Epoch ms this turn runs out, or null when no clock is running. */
   expiresAt: number | null
   onSubmit: (layer: Stroke[]) => void
@@ -31,6 +32,8 @@ export function DrawTurn({
   slot,
   palette,
   priorLayers,
+  width,
+  height,
   expiresAt,
   onSubmit,
   onExpired,
@@ -61,10 +64,13 @@ export function DrawTurn({
     const host = hostRef.current
     if (!host) return
     const s = new Surface(host, {
-      width: CANVAS_W,
-      height: CANVAS_H,
+      width,
+      height,
       tuning: TUNING,
       inkBudget: TUNING.inkBudget,
+      // Edge to edge. On a phone the sheet should be the surface, not an
+      // object sitting on one.
+      fitPad: 1,
       onInk: (used, b) => {
         setInk(used)
         setBudget(b)

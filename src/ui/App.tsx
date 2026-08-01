@@ -115,6 +115,8 @@ export function App() {
       slot={canvas.slot}
       palette={canvas.palette}
       priorLayers={canvas.priorLayers}
+      width={canvas.width}
+      height={canvas.height}
       expiresAt={canvas.expiresAt}
       onExpired={async () => {
         setPhase('loading')

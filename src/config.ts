@@ -3,8 +3,17 @@
 // overridable from the URL (?ink=6000&speedRef=1.2) so a tuning session on a
 // real phone doesn't need a rebuild.
 
+/**
+ * The sheet is square.
+ *
+ * The brief locked 2048×1536, which is print-shaped but wrong for the device
+ * almost everyone will draw on: a 4:3 landscape sheet fitted into a portrait
+ * phone is a band across the middle with dead space above and below, and the
+ * first thing a new player sees is a strip rather than a surface. Square fills
+ * the width, keeps the same rough area, and is still print-viable at 1.0.
+ */
 export const CANVAS_W = 2048
-export const CANVAS_H = 1536
+export const CANVAS_H = 2048
 
 export const SLOTS_PER_CANVAS = 12
 export const TURN_MS = 10 * 60 * 1000

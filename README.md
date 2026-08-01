@@ -238,6 +238,41 @@ someone else's turn, and claiming with a device key that isn't yours are all
 refused. And in the browser, the clock reaching zero locks the pen, disables
 Finish and offers another slot.
 
+## The sheet is square
+
+2048×2048, not the brief's 2048×1536. A 4:3 landscape sheet fitted into a
+portrait phone is a band across the middle with dead space above and below — the
+first thing a new player sees is a strip rather than a surface. Square fills the
+width edge to edge and takes 56% of the stage height on a 375×812 phone, against
+about 42% before.
+
+**A canvas stores its own width and height** (`canvases.width/height`). Every
+renderer reads those rather than the current constant, because otherwise
+changing the default silently reflows everything already in the archive — the
+same strokes composed against a different rectangle. That is the
+invisible-now-permanent-later failure this project cannot afford, and it was
+live for about ten minutes before migration 0008. Canvases opened at 2048×1536
+still render 4:3, verified.
+
+## Ink, measured
+
+The meter is wired to real consumption. Per-stroke cost is logged to the console
+in dev, and at the current 14,000 budget:
+
+| drawing | strokes | ink | of budget |
+|---|---|---|---|
+| stick figure, phone scale | 8 | 4,335 | 31% |
+| one dense scribbled stroke | 1 | 10,909 | 78% |
+
+So a considered contribution runs about 4,000–5,000 and a careless one can eat
+the lot in a single gesture — which is roughly the right shape of incentive.
+14,000 allows about three figures' worth. If contributions should be tighter and
+more deliberate, 8,000–10,000 is the range to try; `?ink=N` to feel it before
+committing.
+
+The meter itself was 3px tall, which made a third of the budget draining look
+like nothing happening. Now 6px.
+
 ## Known gaps
 
 **The device key is a bearer token in local storage.** Clearing it loses your

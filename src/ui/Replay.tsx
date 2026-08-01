@@ -10,6 +10,9 @@ export type ReplayLayer = TimelapseLayer
 
 interface Props {
   layers: ReplayLayer[]
+  /** The sheet this canvas was drawn on, not the current default. */
+  width?: number
+  height?: number
   /** ~20s is the brief's watchable length for twelve slots. */
   durationMs?: number
 }
@@ -27,7 +30,12 @@ interface Props {
  * a rebuild. `selftest` proves that stepping the walk in 2, 7 or 113 chunks
  * lands on pixels identical to one pass.
  */
-export function Replay({ layers, durationMs = 20000 }: Props) {
+export function Replay({
+  layers,
+  width = CANVAS_W,
+  height = CANVAS_H,
+  durationMs = 20000,
+}: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drawnRef = useRef(0)
   const rafRef = useRef(0)
@@ -49,7 +57,7 @@ export function Replay({ layers, durationMs = 20000 }: Props) {
       const cv = canvasRef.current
       if (!cv) return
       const ctx = cv.getContext('2d')!
-      const scale = cv.width / CANVAS_W
+      const scale = cv.width / width
 
       if (target < drawnRef.current) {
         ctx.setTransform(1, 0, 0, 1, 0, 0)
@@ -61,7 +69,7 @@ export function Replay({ layers, durationMs = 20000 }: Props) {
       paintRange(ctx, timeline, drawnRef.current, target)
       drawnRef.current = target
     },
-    [timeline],
+    [timeline, width],
   )
 
   // Any change to what is visible invalidates the accumulated pixels.
@@ -104,8 +112,8 @@ export function Replay({ layers, durationMs = 20000 }: Props) {
       <canvas
         ref={canvasRef}
         className="review-art"
-        width={CANVAS_W / 2}
-        height={CANVAS_H / 2}
+        width={Math.round(width / 2)}
+        height={Math.round(height / 2)}
       />
 
       <div className="row">

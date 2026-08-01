@@ -18,6 +18,10 @@ export interface CanvasRow {
   slots_filled: number
   status: 'open' | 'in_turn' | 'closed'
   palette: string[]
+  /** The sheet this canvas was opened at. Never read a constant instead —
+   *  changing the default would reflow everything already in the archive. */
+  width: number
+  height: number
   created_at: string
   closed_at: string | null
 }

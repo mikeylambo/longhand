@@ -3,8 +3,6 @@ import type { Stroke } from '../engine/types'
 import { renderLayers } from '../engine/render'
 import { countPoints, decodeLayer, encodeLayer } from '../engine/codec'
 import {
-  CANVAS_H,
-  CANVAS_W,
   SIGNATURE_H,
   SIGNATURE_W,
   SLOTS_PER_CANVAS,
@@ -25,15 +23,19 @@ export function Review({ canvas, layer, signature, mode, onNext }: Props) {
   // Round-trip through the wire format rather than rendering the in-memory
   // strokes: if the encoder loses anything, this is where it shows up, not in
   // the gallery two milestones from now.
-  const encoded = useMemo(() => encodeLayer(layer, CANVAS_W, CANVAS_H), [layer])
+  const { width, height } = canvas
+  const encoded = useMemo(
+    () => encodeLayer(layer, width, height),
+    [layer, width, height],
+  )
   const roundTripped = useMemo(() => decodeLayer(encoded), [encoded])
 
   const mine = useMemo(
     () =>
-      renderLayers(CANVAS_W, CANVAS_H, [roundTripped], {
+      renderLayers(width, height, [roundTripped], {
         scale: 0.5,
       }).toDataURL('image/png'),
-    [roundTripped],
+    [roundTripped, width, height],
   )
   const sig = useMemo(
     () =>
@@ -85,7 +87,11 @@ export function Review({ canvas, layer, signature, mode, onNext }: Props) {
         )}
 
         <div className="review-caption">The canvas as it stands</div>
-        <Replay layers={canvas.replayLayers} />
+        <Replay
+          layers={canvas.replayLayers}
+          width={width}
+          height={height}
+        />
 
         <div className="review-caption">Ledger</div>
         <div className="stat">

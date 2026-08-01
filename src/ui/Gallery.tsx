@@ -64,8 +64,8 @@ function GalleryCard({ canvas }: { canvas: CanvasRow }) {
         if (!alive) return
         setSrc(
           renderLayers(
-            CANVAS_W,
-            CANVAS_H,
+            canvas.width ?? CANVAS_W,
+            canvas.height ?? CANVAS_H,
             layers.map((l) => l.strokes),
             { scale: 0.35 },
           ).toDataURL('image/png'),
@@ -75,7 +75,7 @@ function GalleryCard({ canvas }: { canvas: CanvasRow }) {
     return () => {
       alive = false
     }
-  }, [canvas.id])
+  }, [canvas.id, canvas.width, canvas.height])
 
   return (
     <a className="card" href={`/c/${canvas.id}`}>
