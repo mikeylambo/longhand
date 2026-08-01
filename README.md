@@ -26,8 +26,10 @@ VITE_SUPABASE_URL=
 VITE_SUPABASE_PUBLISHABLE_KEY=
 ```
 
-Apply `supabase/migrations/0001_ledger.sql` first. The review screen states
-which mode it ran in, so a test is never ambiguous about whether it saved.
+Both are already set on Vercel and in a local `.env.local`, pointing at the
+`longhand` Supabase project with `supabase/migrations/*.sql` applied in order.
+The review screen states which mode it ran in, so a test is never ambiguous
+about whether it saved.
 
 ## What is built
 
@@ -148,13 +150,60 @@ the broad pen strictly better value per px. Weighting the cost by pen width is
 a one-line change in `StrokeBuilder.add` if playtests show everyone parked on
 the broad nib.
 
-## Unverified
+## What the ledger was tested against
 
-The ledger path is written but has **never run against a live database** — the
-Supabase org is at its free-project limit, so no project exists to migrate into.
-The SQL and the data layer are complete and typechecked; they are not tested.
-Treat `0001_ledger.sql` as unproven until it has been applied once and a layer
-has round-tripped through it.
+Not "it compiles" — the invariants were run against the live database:
+
+| Claim | Result |
+|---|---|
+| Rejoining returns the same open canvas | same id both calls |
+| Slots assign sequentially under a row lock | 1, 2, 3 |
+| Palette accumulates distinct colours only | duplicate collapsed |
+| Rewriting a layer's strokes | blocked by trigger |
+| Deleting a layer | blocked by trigger |
+| Hiding a layer | allowed |
+| Empty layer | refused |
+| `anon` reads canvases | yes |
+| `anon` sees a hidden layer | no — 2 of 3 rows |
+| `anon` inserts / updates / deletes a layer | all blocked |
+| `anon` inserts or updates a canvas | blocked |
+| `anon` adds a signature | yes; an empty one is refused |
+| `anon` reads `signatures.device_key` | permission denied |
+
+Then the same attacks over plain HTTPS with the publishable key, which is what
+an attacker actually has:
+
+- `GET signatures?select=device_key` → `permission denied`
+- `GET signatures?select=*` → `permission denied` (so **always select explicit
+  columns from `signatures`** — `select('*')` will fail, by design)
+- `submit_layer` with someone else's `signature_id` → *that signature does not
+  belong to this browser*
+- `POST /layers` direct → RLS violation
+- `PATCH /layers` to hide someone's work → 0 rows
+- `DELETE /layers` → 0 rows
+
+And the round trip through the real app: a signature written to `signatures`, a
+three-stroke layer stored as slot 1 with 196 points and 3888px of ink at
+2048×1536, then a **second browser identity joined the same canvas**, was given
+slot 2, loaded slot 1's strokes from the database, and was handed the inherited
+five-colour palette.
+
+Two advisory warnings remain and are meant to: `open_or_join_canvas` and
+`submit_layer` are `SECURITY DEFINER` and callable by `anon`. v1 has no
+accounts, so that is the product. Both carry a `COMMENT ON` saying so.
+
+## Known gaps in the ledger
+
+**One player can still fill every slot on a canvas.** Nothing yet ties a slot to
+a distinct person — that is Milestone 3's turn claiming, and it is a real
+griefing vector until then.
+
+**The device key is a bearer token in local storage.** Clearing it loses your
+identity; copying it takes over your identity. Fine for a slice with no
+accounts, not fine for a launch.
+
+**No rate limit.** `submit_layer` caps layer size at 2 MB and 600 strokes, but
+nothing stops repeated calls.
 
 ## Not built yet
 

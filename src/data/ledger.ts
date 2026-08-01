@@ -147,8 +147,12 @@ export async function fetchSignatures(
 }
 
 /**
- * Appends the layer. The slot index is assigned inside the database under a row
- * lock rather than chosen here, so two players can never land on the same slot.
+ * Appends the layer. Two things are deliberately not decided here:
+ *
+ * The slot index is assigned inside the database under a row lock, so two
+ * players can never land on the same slot. And authorship is proved by sending
+ * the device key that created the signature — the column is not readable by
+ * clients, so a layer cannot be attributed to someone else's mark.
  */
 export async function submitLayer(
   canvasId: string,
@@ -162,6 +166,7 @@ export async function submitLayer(
     p_signature: signatureId,
     p_strokes: encodeLayer(strokes, CANVAS_W, CANVAS_H),
     p_ink: ink,
+    p_device_key: deviceKey(),
   })
   if (error) throw new Error(`your layer was not saved: ${error.message}`)
   return data as LayerRow
