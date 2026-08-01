@@ -87,11 +87,51 @@ export function cachedSignatureId(): string | null {
   return localStorage.getItem(SIGNATURE_ID_KEY)
 }
 
-export async function openOrJoinCanvas(): Promise<CanvasRow> {
+export interface TurnRow {
+  id: string
+  canvas_id: string
+  slot_index: number
+  signature_id: string
+  claimed_at: string
+  expires_at: string
+  state: 'active' | 'submitted' | 'expired'
+  palette: string[]
+}
+
+export interface ClaimResult {
+  turn: TurnRow
+  canvas: CanvasRow
+  /** True when an unfinished turn was handed back rather than a new one taken. */
+  resumed: boolean
+}
+
+/**
+ * Reserves a slot and starts the clock.
+ *
+ * Reloading mid-turn must not cost a slot, so the database returns an existing
+ * live turn instead of claiming a second — `resumed` says which happened. The
+ * palette is fixed at claim time and travels on the turn, so it cannot shift
+ * under a player who is halfway through drawing.
+ */
+export async function claimTurn(signatureId: string): Promise<ClaimResult> {
   const db = requireSupabase()
-  const { data, error } = await db.rpc('open_or_join_canvas')
-  if (error) throw new Error(`could not find a canvas: ${error.message}`)
-  return data as CanvasRow
+  const { data, error } = await db.rpc('claim_turn', {
+    p_signature: signatureId,
+    p_device_key: deviceKey(),
+  })
+  if (error) throw new Error(`could not find you a slot: ${error.message}`)
+  return data as ClaimResult
+}
+
+/** Hands a slot back early rather than making the canvas wait out the timer. */
+export async function releaseTurn(turnId: string): Promise<boolean> {
+  const db = requireSupabase()
+  const { data, error } = await db.rpc('release_turn', {
+    p_turn: turnId,
+    p_device_key: deviceKey(),
+  })
+  if (error) return false
+  return Boolean(data)
 }
 
 export async function fetchCanvas(id: string): Promise<CanvasRow | null> {
@@ -149,29 +189,38 @@ export async function fetchSignatures(
 }
 
 /**
- * Appends the layer. Two things are deliberately not decided here:
- *
- * The slot index is assigned inside the database under a row lock, so two
- * players can never land on the same slot. And authorship is proved by sending
- * the device key that created the signature — the column is not readable by
- * clients, so a layer cannot be attributed to someone else's mark.
+ * Submit-and-lock. A layer can only be written against a live turn, at the slot
+ * that turn reserved — so the slot index is never chosen here. Authorship is
+ * proved by the device key that created the signature; that column is not
+ * readable by clients, so a layer cannot be attributed to someone else's mark.
  */
-export async function submitLayer(
-  canvasId: string,
-  signatureId: string,
+export async function submitTurn(
+  turnId: string,
   strokes: Stroke[],
-): Promise<LayerRow> {
+): Promise<{ layer: LayerRow; canvas: CanvasRow }> {
   const db = requireSupabase()
   const ink = Math.round(strokes.reduce((n, s) => n + s.ink, 0))
-  const { data, error } = await db.rpc('submit_layer', {
-    p_canvas: canvasId,
-    p_signature: signatureId,
+  const { data, error } = await db.rpc('submit_turn', {
+    p_turn: turnId,
     p_strokes: encodeLayer(strokes, CANVAS_W, CANVAS_H),
     p_ink: ink,
     p_device_key: deviceKey(),
   })
   if (error) throw new Error(`your layer was not saved: ${error.message}`)
-  return data as LayerRow
+  return data as { layer: LayerRow; canvas: CanvasRow }
+}
+
+/** Closed canvases, newest first — the gallery. */
+export async function fetchClosedCanvases(limit = 40): Promise<CanvasRow[]> {
+  const db = requireSupabase()
+  const { data, error } = await db
+    .from('canvases')
+    .select('*')
+    .eq('status', 'closed')
+    .order('closed_at', { ascending: false })
+    .limit(limit)
+  if (error) throw new Error(`could not load the gallery: ${error.message}`)
+  return (data ?? []) as CanvasRow[]
 }
 
 /**

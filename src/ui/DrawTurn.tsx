@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Surface } from '../engine/surface'
 import type { Stroke } from '../engine/types'
 import {
@@ -12,6 +12,7 @@ import {
 } from '../config'
 import { FitIcon, UndoIcon } from './icons'
 import { Tuner } from './Tuner'
+import { TurnClock } from './TurnClock'
 
 interface Props {
   seed: string
@@ -19,10 +20,21 @@ interface Props {
   /** Palette inheritance: what's already on the canvas, plus two new colours. */
   palette: string[]
   priorLayers: Stroke[][]
+  /** Epoch ms this turn runs out, or null when no clock is running. */
+  expiresAt: number | null
   onSubmit: (layer: Stroke[]) => void
+  onExpired: () => void
 }
 
-export function DrawTurn({ seed, slot, palette, priorLayers, onSubmit }: Props) {
+export function DrawTurn({
+  seed,
+  slot,
+  palette,
+  priorLayers,
+  expiresAt,
+  onSubmit,
+  onExpired,
+}: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
   const surfaceRef = useRef<Surface | null>(null)
 
@@ -35,6 +47,15 @@ export function DrawTurn({ seed, slot, palette, priorLayers, onSubmit }: Props) 
   const [size, setSize] = useState(1)
   const [tuning, setTuning] = useState<Tuning>(TUNING)
   const [showHint, setShowHint] = useState(true)
+  const [expired, setExpired] = useState(false)
+
+  // When the clock runs out the pen stops working, but the sheet stays on
+  // screen — vanishing the drawing the instant it is lost would be crueller
+  // than showing what was lost.
+  const handleExpired = useCallback(() => {
+    setExpired(true)
+    surfaceRef.current?.setLocked(true)
+  }, [])
 
   useEffect(() => {
     const host = hostRef.current
@@ -83,12 +104,13 @@ export function DrawTurn({ seed, slot, palette, priorLayers, onSubmit }: Props) 
       <header className="topbar">
         <div className="slot">
           Slot {slot} / {SLOTS_PER_CANVAS}
+          <TurnClock expiresAt={expiresAt} onExpired={handleExpired} />
         </div>
         <div className="seed">“{seed}”</div>
         <div className="right">
           <button
             className="linkbtn solid"
-            disabled={strokeCount === 0}
+            disabled={strokeCount === 0 || expired}
             onClick={() => onSubmit(surfaceRef.current?.getLayer() ?? [])}
           >
             Finish
@@ -142,8 +164,22 @@ export function DrawTurn({ seed, slot, palette, priorLayers, onSubmit }: Props) 
         </div>
 
         <div className="zoomtag">{zoomLabel}%</div>
-        {showHint && (
+        {showHint && !expired && (
           <div className="hint">Two fingers to move and zoom</div>
+        )}
+        {expired && (
+          <div className="expired">
+            <div>
+              <strong>Your turn ran out.</strong>
+              <p>
+                The slot has gone back to the pool for someone else. Nothing you
+                drew was saved.
+              </p>
+              <button className="linkbtn solid" onClick={onExpired}>
+                Take another slot
+              </button>
+            </div>
+          </div>
         )}
       </div>
 

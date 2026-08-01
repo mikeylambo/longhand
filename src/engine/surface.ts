@@ -77,6 +77,7 @@ export class Surface {
   private raf = 0
   private ro: ResizeObserver
   private destroyed = false
+  private locked = false
 
   constructor(host: HTMLElement, opts: SurfaceOptions) {
     this.host = host
@@ -127,6 +128,15 @@ export class Surface {
 
   setSizeIndex(i: number): void {
     this.sizeIndex = Math.max(0, Math.min(PEN_WIDTHS.length - 1, i))
+  }
+
+  /**
+   * Stops the surface accepting new strokes. Used when the turn clock runs
+   * out: the sheet stays visible, the pen just stops working.
+   */
+  setLocked(locked: boolean): void {
+    this.locked = locked
+    if (locked) this.abortStroke()
   }
 
   /** Live retune from the ?tune=1 panel, mid-session, without a reload. */
@@ -417,6 +427,7 @@ export class Surface {
     }
 
     if (this.gesture) return
+    if (this.locked) return
     // Once a stylus has been seen, touch is palm — it pans but never paints.
     if (this.penSeen && e.pointerType === 'touch') return
     if (this.inkUsed >= this.opts.inkBudget) return

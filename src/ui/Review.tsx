@@ -99,6 +99,11 @@ export function Review({ canvas, layer, signature, mode, onNext }: Props) {
             : 'Local mode: nothing was persisted. Set the Supabase env vars to write to the ledger.'}
         </div>
         <div className="row">
+          {canvas.canvasId && (
+            <a className="linkbtn" href={`/c/${canvas.canvasId}`}>
+              Its own page
+            </a>
+          )}
           <button className="linkbtn" onClick={download}>
             Download layer JSON
           </button>
@@ -106,9 +111,16 @@ export function Review({ canvas, layer, signature, mode, onNext }: Props) {
       </div>
 
       <div className="row">
+        {mode === 'ledger' && (
+          <a className="linkbtn" href="/gallery">
+            Gallery
+          </a>
+        )}
         <div className="spacer" />
         <button className="linkbtn solid" onClick={onNext}>
-          {canvas.closed ? 'Start a new canvas' : 'Take the next slot'}
+          {/* One hand per canvas is the premise, so drawing again means being
+              sent to a different sheet — not back to this one. */}
+          {mode === 'ledger' ? 'Draw on another canvas' : 'Take the next slot'}
         </button>
       </div>
     </div>

@@ -2,9 +2,10 @@
 
 *A museum the world fills in, one stranger at a time.*
 
-Milestones 1 and 2 of the v1 brief: **the surface** and **the ledger**. Drawing
-works and feels good, and every stroke persists as vectors, replays correctly,
-and can be isolated per contributor. No queue, no timer, no accounts.
+Milestones 1–4 of the v1 brief: **the surface**, **the ledger**, **the loop**
+and **the close**. Twelve distinct hands claim slots on a shared sheet, each on
+a ten-minute clock, and when the twelfth submits the canvas locks forever and
+gets its own page. No accounts.
 
 ```bash
 npm install
@@ -76,8 +77,30 @@ milestones from now.
 **The timelapse**, rendered from the ledger rather than a video file. Scrub the
 whole canvas filling in, and tap any contributor to isolate or hide their layer
 — which is both the "your layer alone" card and the hide-never-delete moderation
-primitive. The milestone 4 server-side MP4 render is the same walk over the same
-data.
+primitive.
+
+**The loop.** A slot is *claimed* before it is drawn on, so nothing is
+double-booked and nothing is reserved forever:
+
+- `claim_turn` reserves a slot and starts a ten-minute clock. Reloading resumes
+  the same turn rather than burning a second slot.
+- A partial unique index on `(canvas_id, slot_index) where state = 'active'`
+  makes a double-booked slot impossible to *store*. The advisory lock and the
+  row lock are reasoning; the index is a fact.
+- `layers (canvas_id, signature_id)` is unique, so **one hand per canvas**. That
+  is the whole premise, and until this milestone one person could fill a canvas
+  alone.
+- Abandoned slots return to the pool. `sweep_expired_turns` runs every minute on
+  pg_cron *and* opportunistically at the top of every claim, so the relay keeps
+  healing even with no scheduler running — which matters most precisely when
+  nobody is arriving.
+- The clock is visible from the first second, because per the brief an expired
+  slot returns to the pool and the drawing is lost.
+
+**The close.** Slot 12 submits, the canvas flips to `closed`, and it gets a
+shareable page at `/c/<id>` with the full piece, the scrubbable timelapse, every
+contributor's layer alone, and PNG downloads. `/gallery` lists finished work,
+newest first — no counts, no ranking, no leaderboard, ever.
 
 ## Rendering model
 
@@ -192,23 +215,59 @@ Two advisory warnings remain and are meant to: `open_or_join_canvas` and
 `submit_layer` are `SECURITY DEFINER` and callable by `anon`. v1 has no
 accounts, so that is the product. Both carry a `COMMENT ON` saying so.
 
-## Known gaps in the ledger
+## What the loop was tested against
 
-**One player can still fill every slot on a canvas.** Nothing yet ties a slot to
-a distinct person — that is Milestone 3's turn claiming, and it is a real
-griefing vector until then.
+The concurrency bug is the one that fails silently, so it was tested before the
+feature was wired to any UI: **20 simultaneous `claim_turn` calls over HTTPS**,
+fired in parallel with no stagger.
+
+- 20 claims returned, 0 errors
+- **zero double-booked slots**
+- the first canvas took exactly slots 1–12; the overflow opened a second canvas
+  and took 1–8
+
+Then the rest of the state machine: a hand-written duplicate active turn is
+refused by the index; reloading resumes the same turn; a player holds at most
+one turn anywhere; the sweep expires an abandoned turn and another player
+immediately reclaims that slot; twelve submits flip the canvas to `closed` with
+`closed_at` set and **twelve distinct signatures**; a closed canvas takes no
+more claims.
+
+Over REST with the publishable key: submitting against an expired turn, against
+someone else's turn, and claiming with a device key that isn't yours are all
+refused. And in the browser, the clock reaching zero locks the pen, disables
+Finish and offers another slot.
+
+## Known gaps
 
 **The device key is a bearer token in local storage.** Clearing it loses your
 identity; copying it takes over your identity. Fine for a slice with no
 accounts, not fine for a launch.
 
-**No rate limit.** `submit_layer` caps layer size at 2 MB and 600 strokes, but
-nothing stops repeated calls.
+**No rate limit.** `submit_turn` caps a layer at 2 MB and 600 strokes and a turn
+must be claimed first, but nothing throttles repeated claims across many
+signatures.
+
+**Losing an unsubmitted drawing at 10:00 is harsh.** It is what the brief
+specifies, and the clock is visible throughout — but auto-submitting non-empty
+work would keep the canvas moving *and* not destroy anything. Worth a decision
+after real strangers hit it.
+
+**Testing a close alone is now impossible on the ledger.** One hand per canvas
+is enforced in the database, so watching a canvas fill takes twelve real
+browsers — which is the brief's success criterion, not an obstacle to route
+around. Run without Supabase credentials for a solo relay when you only want to
+exercise the surface.
 
 ## Not built yet
 
-Turn timer, slot claiming and expiry, auto-routing, accounts, notifications, the
-gallery, the server-side MP4 render — Milestones 3–5, per the brief.
+The server-side MP4 render. The gallery, the canvas page and the personal cards
+all render from stroke vectors at request time, which is fast and always
+current, but a real downloadable video needs a rendering worker — that is its
+own piece of work rather than a corner of this one.
+
+Notifications (Milestone 5). Accounts, the world map, prints, school accounts —
+all explicitly out of scope for v1.
 
 No service worker yet. The manifest is in place; a caching strategy is worth
-nothing until the ledger is real.
+nothing until there is something to be offline from.

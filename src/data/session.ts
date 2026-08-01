@@ -1,16 +1,17 @@
 import type { Stroke } from '../engine/types'
 import type { ReplayLayer } from '../ui/Replay'
 import { LEDGER_ENABLED } from '../lib/supabase'
-import { MASTER_PALETTE, SLOTS_PER_CANVAS } from '../config'
+import { MASTER_PALETTE, SLOTS_PER_CANVAS, TURN_MS } from '../config'
 import { pickSeed, saveSignature } from '../store'
 import {
   cachedSignatureId,
+  claimTurn,
   ensureSignature,
   fetchCanvas,
   fetchLayers,
   inheritedPalette,
-  openOrJoinCanvas,
-  submitLayer,
+  releaseTurn,
+  submitTurn,
 } from './ledger'
 
 export interface CanvasState {
@@ -20,14 +21,17 @@ export interface CanvasState {
   slot: number
   /**
    * The slot just submitted, for the review screen. In ledger mode this is the
-   * index the database assigned under a row lock, not one the client guessed —
-   * someone else may have taken a slot while this turn was open.
+   * index the database reserved at claim time, not one the client guessed.
    */
   justFilledSlot: number | null
   priorLayers: Stroke[][]
   replayLayers: ReplayLayer[]
   palette: string[]
   closed: boolean
+  /** The live turn, if one is held. */
+  turnId: string | null
+  /** Epoch ms the turn runs out, or null when no clock is running. */
+  expiresAt: number | null
 }
 
 export interface Session {
@@ -37,9 +41,9 @@ export interface Session {
   join(): Promise<CanvasState>
   submit(layer: Stroke[]): Promise<CanvasState>
   nextCanvas(): Promise<CanvasState>
+  /** Hands the slot back rather than making the canvas wait out the clock. */
+  abandon(): Promise<void>
 }
-
-const CANVAS_KEY = 'longhand.canvas.v1'
 
 function paletteFor(layers: Stroke[][], seed: string): string[] {
   const used = layers.flat().map((s) => s.color)
@@ -47,14 +51,16 @@ function paletteFor(layers: Stroke[][], seed: string): string[] {
 }
 
 /**
- * No backend: the twelve-slot relay is faked in the browser so the surface can
- * be tested without a database. Deliberately the wrong social model — it exists
- * to exercise the rendering path, not to be played.
+ * No backend: the twelve-slot relay is faked in the browser so the surface and
+ * the turn clock can be exercised without a database. Deliberately the wrong
+ * social model — in particular it lets one person fill every slot, which the
+ * real ledger forbids.
  */
 class LocalSession implements Session {
   readonly mode = 'local' as const
   private seed = pickSeed()
   private layers: Stroke[][] = []
+  private expiresAt: number | null = null
 
   hasSignature(): boolean {
     return Boolean(localStorage.getItem('longhand.signature.v1'))
@@ -65,18 +71,24 @@ class LocalSession implements Session {
   }
 
   async join(): Promise<CanvasState> {
+    this.expiresAt = Date.now() + TURN_MS
     return this.state()
   }
 
   async submit(layer: Stroke[]): Promise<CanvasState> {
     this.layers = [...this.layers, layer]
+    this.expiresAt = null
     return this.state(this.layers.length)
   }
 
   async nextCanvas(): Promise<CanvasState> {
     this.seed = pickSeed()
     this.layers = []
-    return this.state()
+    return this.join()
+  }
+
+  async abandon(): Promise<void> {
+    this.expiresAt = null
   }
 
   private state(justFilledSlot: number | null = null): CanvasState {
@@ -92,13 +104,15 @@ class LocalSession implements Session {
       })),
       palette: paletteFor(this.layers, this.seed),
       closed: this.layers.length >= SLOTS_PER_CANVAS,
+      turnId: null,
+      expiresAt: this.expiresAt,
     }
   }
 }
 
 class LedgerSession implements Session {
   readonly mode = 'ledger' as const
-  private canvasId: string | null = localStorage.getItem(CANVAS_KEY)
+  private turnId: string | null = null
 
   hasSignature(): boolean {
     return Boolean(cachedSignatureId())
@@ -109,60 +123,96 @@ class LedgerSession implements Session {
     await ensureSignature(strokes)
   }
 
+  /**
+   * Claims a slot. The database decides which canvas and which slot, and hands
+   * back an unfinished turn rather than a new one if this browser already holds
+   * one — so a reload does not cost a slot.
+   */
   async join(): Promise<CanvasState> {
-    const canvas = await openOrJoinCanvas()
-    this.canvasId = canvas.id
-    localStorage.setItem(CANVAS_KEY, canvas.id)
-    return this.hydrate(canvas.id, canvas.seed_word, canvas.slot_count)
-  }
-
-  async submit(layer: Stroke[]): Promise<CanvasState> {
     const signatureId = cachedSignatureId()
     if (!signatureId) throw new Error('no signature registered for this browser')
-    if (!this.canvasId) throw new Error('no canvas joined')
 
-    const row = await submitLayer(this.canvasId, signatureId, layer)
-    // Re-read rather than assume: the slot index is assigned by the database,
-    // and someone else may have filled a slot while this turn was open.
-    return this.hydrate(this.canvasId, undefined, SLOTS_PER_CANVAS, row.slot_index)
-  }
+    const { turn, canvas } = await claimTurn(signatureId)
+    this.turnId = turn.id
 
-  async nextCanvas(): Promise<CanvasState> {
-    localStorage.removeItem(CANVAS_KEY)
-    this.canvasId = null
-    return this.join()
-  }
-
-  private async hydrate(
-    canvasId: string,
-    seed?: string,
-    slotCount = SLOTS_PER_CANVAS,
-    justFilledSlot: number | null = null,
-  ): Promise<CanvasState> {
-    const layers = await fetchLayers(canvasId)
-    const priorLayers = layers.map((l) => l.strokes)
-    const seedWord = seed ?? (await this.seedFor(canvasId))
+    const layers = await fetchLayers(canvas.id)
     return {
-      canvasId,
-      seed: seedWord,
-      slot: Math.min(layers.length + 1, slotCount),
-      justFilledSlot,
-      priorLayers,
+      canvasId: canvas.id,
+      seed: canvas.seed_word,
+      slot: turn.slot_index,
+      justFilledSlot: null,
+      priorLayers: layers.map((l) => l.strokes),
       replayLayers: layers.map((l) => ({
         slotIndex: l.slotIndex,
         strokes: l.strokes,
       })),
-      palette: paletteFor(priorLayers, canvasId),
-      closed: layers.length >= slotCount,
+      // Fixed at claim time, server-side, so it cannot shift mid-turn.
+      palette: turn.palette?.length ? turn.palette : [...MASTER_PALETTE],
+      closed: false,
+      turnId: turn.id,
+      expiresAt: Date.parse(turn.expires_at),
     }
   }
 
-  private async seedFor(canvasId: string): Promise<string> {
-    const c = await fetchCanvas(canvasId)
-    return c?.seed_word ?? 'untitled'
+  async submit(layer: Stroke[]): Promise<CanvasState> {
+    if (!this.turnId) throw new Error('no turn is open')
+    const { layer: row, canvas } = await submitTurn(this.turnId, layer)
+    this.turnId = null
+
+    const layers = await fetchLayers(canvas.id)
+    return {
+      canvasId: canvas.id,
+      seed: canvas.seed_word,
+      slot: Math.min(layers.length + 1, canvas.slot_count),
+      justFilledSlot: row.slot_index,
+      priorLayers: layers.map((l) => l.strokes),
+      replayLayers: layers.map((l) => ({
+        slotIndex: l.slotIndex,
+        strokes: l.strokes,
+      })),
+      palette: canvas.palette ?? [],
+      closed: canvas.status === 'closed',
+      turnId: null,
+      expiresAt: null,
+    }
+  }
+
+  /**
+   * There is no "next slot on this canvas" — one hand per canvas is the whole
+   * premise, so drawing again means being sent somewhere else.
+   */
+  async nextCanvas(): Promise<CanvasState> {
+    this.turnId = null
+    return this.join()
+  }
+
+  async abandon(): Promise<void> {
+    const id = this.turnId
+    this.turnId = null
+    if (id) await releaseTurn(id)
   }
 }
 
 export function createSession(): Session {
   return LEDGER_ENABLED ? new LedgerSession() : new LocalSession()
+}
+
+/** Used by the shareable canvas page, which has no session and no turn. */
+export async function loadCanvasForViewing(canvasId: string): Promise<{
+  seed: string
+  closed: boolean
+  slotCount: number
+  closedAt: string | null
+  layers: ReplayLayer[]
+} | null> {
+  const canvas = await fetchCanvas(canvasId)
+  if (!canvas) return null
+  const layers = await fetchLayers(canvasId)
+  return {
+    seed: canvas.seed_word,
+    closed: canvas.status === 'closed',
+    slotCount: canvas.slot_count,
+    closedAt: canvas.closed_at,
+    layers: layers.map((l) => ({ slotIndex: l.slotIndex, strokes: l.strokes })),
+  }
 }
