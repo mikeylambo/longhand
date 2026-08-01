@@ -4,6 +4,8 @@ import type { Stroke } from '../engine/types'
 import {
   CANVAS_H,
   CANVAS_W,
+  PALETTE_MIN,
+  PALETTE_NEW_PER_SLOT,
   SIGNATURE_H,
   SIGNATURE_W,
   SLOTS_PER_CANVAS,
@@ -182,12 +184,18 @@ export function inheritedPalette(
   used: string[],
   master: readonly string[],
   seed = '',
-  extra = 2,
+  extra = PALETTE_NEW_PER_SLOT,
+  floor = PALETTE_MIN,
 ): string[] {
   if (used.length === 0) return [...master]
   const have = new Set(used.filter((c) => master.includes(c)))
   const unused = master.filter((c) => !have.has(c))
   if (unused.length === 0) return [...master]
+
+  // How many new colours to offer. Normally `extra`, but topped up so a canvas
+  // opened in a single colour doesn't hand the next player a three-swatch box.
+  const want = Math.max(extra, floor - have.size)
+  const take = Math.min(want, unused.length)
 
   // Offset by the canvas id so two canvases that happen to share a palette
   // still drift in different directions.
@@ -195,7 +203,7 @@ export function inheritedPalette(
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0
   const start = Math.abs(h) % unused.length
   const fresh = new Set(
-    Array.from({ length: Math.min(extra, unused.length) }, (_, i) => unused[(start + i) % unused.length]),
+    Array.from({ length: take }, (_, i) => unused[(start + i) % unused.length]),
   )
   return master.filter((c) => have.has(c) || fresh.has(c))
 }

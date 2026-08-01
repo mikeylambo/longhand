@@ -1,24 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Stroke } from '../engine/types'
-import { drawSegments } from '../engine/render'
 import { CANVAS_H, CANVAS_W, PAPER } from '../config'
+import {
+  buildTimeline,
+  paintRange,
+  type TimelapseLayer,
+} from '../engine/timelapse'
 
-export interface ReplayLayer {
-  slotIndex: number
-  strokes: Stroke[]
-}
+export type ReplayLayer = TimelapseLayer
 
 interface Props {
   layers: ReplayLayer[]
   /** ~20s is the brief's watchable length for twelve slots. */
   durationMs?: number
-}
-
-interface Cue {
-  stroke: Stroke
-  /** Global point index this stroke begins at. */
-  start: number
-  len: number
 }
 
 /**
@@ -27,11 +20,12 @@ interface Cue {
  * This is the milestone 2 proof: if strokes replay correctly and can be
  * isolated per contributor, then vectors really are the single source of truth
  * — and the server-side MP4 render at milestone 4 is the same walk over the
- * same data.
+ * same data, through `buildTimeline`/`paintRange`.
  *
- * Playback advances monotonically, so frames are drawn incrementally onto a
+ * Playback advances monotonically, so frames composite incrementally onto a
  * persistent canvas; only scrubbing backwards or toggling a contributor forces
- * a rebuild.
+ * a rebuild. `selftest` proves that stepping the walk in 2, 7 or 113 chunks
+ * lands on pixels identical to one pass.
  */
 export function Replay({ layers, durationMs = 20000 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -45,18 +39,10 @@ export function Replay({ layers, durationMs = 20000 }: Props) {
   const [pos, setPos] = useState(1)
   const [playing, setPlaying] = useState(false)
 
-  const cues = useMemo(() => {
-    const out: Cue[] = []
-    let n = 0
-    for (const layer of layers) {
-      if (!visible.has(layer.slotIndex)) continue
-      for (const stroke of layer.strokes) {
-        out.push({ stroke, start: n, len: stroke.pts.length })
-        n += stroke.pts.length
-      }
-    }
-    return { list: out, total: n }
-  }, [layers, visible])
+  const timeline = useMemo(
+    () => buildTimeline(layers, visible),
+    [layers, visible],
+  )
 
   const paint = useCallback(
     (target: number) => {
@@ -72,18 +58,10 @@ export function Replay({ layers, durationMs = 20000 }: Props) {
         drawnRef.current = 0
       }
       ctx.setTransform(scale, 0, 0, scale, 0, 0)
-
-      for (const cue of cues.list) {
-        const end = cue.start + cue.len
-        if (end <= drawnRef.current) continue
-        if (cue.start >= target) break
-        const from = Math.max(0, drawnRef.current - cue.start)
-        const to = Math.min(cue.len, target - cue.start)
-        if (to > from) drawSegments(ctx, cue.stroke, from, to)
-      }
+      paintRange(ctx, timeline, drawnRef.current, target)
       drawnRef.current = target
     },
-    [cues],
+    [timeline],
   )
 
   // Any change to what is visible invalidates the accumulated pixels.
@@ -95,8 +73,8 @@ export function Replay({ layers, durationMs = 20000 }: Props) {
     ctx.fillStyle = PAPER
     ctx.fillRect(0, 0, cv.width, cv.height)
     drawnRef.current = 0
-    paint(Math.round(pos * cues.total))
-  }, [cues, paint, pos])
+    paint(Math.round(pos * timeline.total))
+  }, [timeline, paint, pos])
 
   useEffect(() => {
     if (!playing) return

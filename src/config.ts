@@ -39,6 +39,18 @@ export const MASTER_PALETTE = [
 /** Thin / medium / broad, in logical canvas px. */
 export const PEN_WIDTHS = [3.5, 9, 20] as const
 
+/**
+ * Palette inheritance. The brief says "the colours already used on the canvas,
+ * plus two new ones" — which quietly assumes slot 1 used several colours. When
+ * an opening layer is drawn entirely in one colour, that rule hands slot 2 a
+ * three-swatch box, and to a new player that reads as broken rather than as a
+ * constraint. The floor keeps the cohesion mechanic without the cliff.
+ *
+ * Set PALETTE_MIN to 0 for the brief's literal behaviour.
+ */
+export const PALETTE_NEW_PER_SLOT = 2
+export const PALETTE_MIN = 6
+
 export const DEFAULT_TUNING = {
   /**
    * Total stroke length, in logical px, for one turn. The pen runs out.

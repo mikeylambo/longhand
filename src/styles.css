@@ -391,6 +391,43 @@ button {
   color: var(--paper);
 }
 
+/* -------------------------------------------------------------- self test */
+
+.checks {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.checks td {
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--rule);
+  vertical-align: top;
+}
+
+.checks td:first-child {
+  width: 20px;
+  font-weight: 700;
+}
+
+.checks tr.pass td:first-child {
+  color: #48764f;
+}
+
+.checks tr.fail td:first-child {
+  color: #a73a34;
+}
+
+.checks .num {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.checks .stat {
+  margin: 2px 0 0;
+}
+
 /* ------------------------------------------------------------------ tuner */
 
 .tuner {
