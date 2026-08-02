@@ -384,6 +384,18 @@ protected project ref, or if they match the app's own `VITE_SUPABASE_URL`.
 Missing credentials fail the run rather than skipping it — a skipped safety test
 reads as green.
 
+Point them at a **local** stack, not a second cloud project:
+
+```bash
+supabase start   # needs Docker; prints a URL and anon key for .env.test.local
+```
+
+Free, ephemeral, and it cannot be production by construction. A second cloud
+project also satisfies the guards, but it costs a project slot and leaves two
+databases whose migrations have to be kept in step. Neither is set up here —
+Docker isn't installed on this machine and the Supabase org is at its
+two-active-project limit — so `test:ledger` fails by design until one exists.
+
 ```bash
 npm run test:app      # everything that needs only a browser
 npm run test:ledger   # needs the throwaway project

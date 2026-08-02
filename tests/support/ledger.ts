@@ -17,6 +17,11 @@
  *
  * A project ref is not a secret — it ships in the client bundle — so listing
  * the live one here costs nothing and makes the rule impossible to misread.
+ *
+ * None of this cares *where* the throwaway is. A local `supabase start` at
+ * 127.0.0.1 satisfies all three guards, costs nothing, and cannot be production
+ * by construction — which makes it the better answer than a second cloud
+ * project, not the fallback.
  */
 
 /** Never writable by a test, whatever the environment says. */
@@ -26,12 +31,16 @@ const PROTECTED_REFS = [
 ]
 
 const SETUP = `
-Set up a throwaway Supabase project and put its details in .env.test.local:
+Point these specs at a throwaway database in .env.test.local.
 
-  TEST_SUPABASE_URL=https://<throwaway-ref>.supabase.co
-  TEST_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+Easiest, and free:
 
-Apply supabase/migrations/*.sql to it in order. See .env.test.example.
+  supabase start                      # needs Docker
+  TEST_SUPABASE_URL=http://127.0.0.1:54321
+  TEST_SUPABASE_PUBLISHABLE_KEY=<the anon key supabase start prints>
+
+Or a second cloud project, if you cannot run Docker. Either way apply
+supabase/migrations/*.sql in order. See .env.test.example.
 `.trim()
 
 export interface Ledger {
