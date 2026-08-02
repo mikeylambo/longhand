@@ -134,42 +134,52 @@ function stroke(path, color, size, rand, t0) {
 
 // ------------------------------------------------------------------- scene
 
-const INK = '#1B1A17'
-const GRAPHITE = '#5B5850'
-const ASH = '#9C978B'
+// The sixteen families, the tints and shades behind them, and two colours
+// mixed on the hue wheel — so a finished canvas shows what the expanded system
+// actually looks like rather than only the swatch row.
+const INK = '#1B1A17', INK_D = '#0E0D0C', INK_L = '#656157', INK_LL = '#A09D93'
+const GRAPHITE = '#5B5850', GRAPHITE_L = '#8F8B81'
+const ASH = '#9C978B', ASH_L = '#B9B6AE', ASH_LL = '#D3D1CD'
 const CHALK = '#FBF8F1'
-const RED = '#A73A34'
-const AMBER = '#E5A23C'
-const OCHRE = '#B8873C'
-const FERN = '#48764F'
-const TEAL = '#2C7A73'
-const SLATE = '#3B6288'
-const VIOLET = '#6A4B82'
+const RED = '#A73A34', RED_D = '#7C2A26', RED_DD = '#551C19', RED_L = '#C96E69'
+const AMBER = '#E5A23C', AMBER_D = '#BE7C18', AMBER_L = '#E7BD7C', AMBER_LL = '#EBD4B1'
+const OCHRE = '#B8873C', OCHRE_L = '#CCAB77'
+const FERN = '#48764F', FERN_D = '#233C27', FERN_L = '#77A77E', FERN_LL = '#ABC6AF'
+const TEAL = '#2C7A73', TEAL_D = '#205B56', TEAL_L = '#54BAB0', TEAL_LL = '#98CFCA'
+const SLATE = '#3B6288', SLATE_D = '#2B4965', SLATE_L = '#6A91B8', SLATE_LL = '#A4BACF'
+const VIOLET = '#6A4B82', VIOLET_L = '#987AAE'
+// Mixed: any hue, held to the palette's light (h, 52%, 46%).
+const MIXED_SEA = '#388EB2'   // hue 198
+const MIXED_ROSE = '#B2385D'  // hue 342
 
 /** Twelve hands on one harbour, each adding what the last one left room for. */
 const LAYERS = [
   // 1 — the horizon. Someone has to decide where the world ends.
   (r) => [
     stroke(line(70, HORIZON, 1980, HORIZON - 8, 120, r, 7), INK, 0, r, 0),
-    stroke(line(330, HORIZON + 26, 1520, HORIZON + 20, 80, r, 5), ASH, 0, r, 1400),
+    stroke(line(330, HORIZON + 26, 1520, HORIZON + 20, 80, r, 5), ASH_L, 0, r, 1400),
   ],
   // 2 — hills behind it
   (r) => [
-    stroke(through([[70, HORIZON], [250, 1078], [450, 1132], [640, HORIZON]], 26, r, 5), FERN, 1, r, 0),
+    stroke(through([[70, HORIZON], [250, 1078], [450, 1132], [640, HORIZON]], 26, r, 5), FERN_D, 1, r, 0),
     stroke(through([[1330, HORIZON], [1520, 1090], [1740, 1140], [1980, HORIZON - 6]], 26, r, 5), FERN, 1, r, 1600),
-    stroke(through([[600, HORIZON], [770, 1124], [930, HORIZON]], 22, r, 4), FERN, 0, r, 3100),
+    stroke(through([[600, HORIZON], [770, 1124], [930, HORIZON]], 22, r, 4), FERN_L, 0, r, 3100),
+    stroke(through([[900, HORIZON - 4], [1120, 1140], [1340, HORIZON - 2]], 20, r, 4), FERN_LL, 0, r, 4400),
   ],
   // 3 — a low sun and some weather
   (r) => [
     stroke(arc(1566, 742, 134, 134, 0, Math.PI * 2, 90, r, 6), AMBER, 1, r, 0),
-    stroke(line(300, 700, 720, 686, 40, r, 9), AMBER, 0, r, 2000),
-    stroke(line(360, 742, 640, 736, 30, r, 7), AMBER, 0, r, 3000),
-    stroke(line(1140, 546, 1560, 536, 40, r, 9), AMBER, 0, r, 4000),
+    stroke(arc(1566, 742, 96, 96, 0, Math.PI * 2, 70, r, 5), AMBER_L, 0, r, 1500),
+    stroke(line(300, 700, 720, 686, 40, r, 9), AMBER_LL, 0, r, 2600),
+    stroke(line(360, 742, 640, 736, 30, r, 7), AMBER_L, 0, r, 3400),
+    stroke(line(1140, 546, 1560, 536, 40, r, 9), AMBER_D, 0, r, 4200),
   ],
   // 4 — the boat everything else will hang off
   (r) => [
     stroke(through([[600, 1226], [688, 1336], [980, 1382], [1230, 1332], [1306, 1224]], 30, r, 4), RED, 2, r, 0),
-    stroke(line(600, 1226, 1306, 1224, 60, r, 4), RED, 1, r, 2600),
+    stroke(through([[660, 1276], [760, 1352], [990, 1392], [1200, 1348]], 26, r, 4), RED_DD, 1, r, 2200),
+    stroke(line(600, 1226, 1306, 1224, 60, r, 4), RED_D, 1, r, 4000),
+    stroke(line(700, 1256, 1210, 1254, 40, r, 3), RED_L, 0, r, 5400),
   ],
   // 5 — mast and sail
   (r) => [
@@ -177,13 +187,14 @@ const LAYERS = [
     stroke(through([[958, 646], [1120, 900], [1218, 1186]], 30, r, 4), INK, 1, r, 1400),
     stroke(line(1218, 1190, 968, 1200, 34, r, 4), INK, 1, r, 3000),
     stroke(through([[986, 760], [1090, 950], [1150, 1160]], 26, r, 4), CHALK, 2, r, 4200),
+    stroke(through([[1010, 900], [1096, 1040], [1132, 1150]], 20, r, 3), ASH_LL, 1, r, 5000),
     stroke(line(958, 660, 972, 1198, 44, r, 3), INK, 0, r, 5400),
   ],
   // 6 — a second, smaller boat further out
   (r) => [
     stroke(through([[1466, 1206], [1522, 1268], [1676, 1286], [1790, 1258], [1824, 1200]], 24, r, 4), OCHRE, 1, r, 0),
-    stroke(line(1620, 1206, 1628, 980, 26, r, 3), OCHRE, 0, r, 1600),
-    stroke(through([[1628, 998], [1712, 1120], [1748, 1198]], 20, r, 3), OCHRE, 1, r, 2400),
+    stroke(line(1620, 1206, 1628, 980, 26, r, 3), INK_L, 0, r, 1600),
+    stroke(through([[1628, 998], [1712, 1120], [1748, 1198]], 20, r, 3), OCHRE_L, 1, r, 2400),
   ],
   // 7 — water
   (r) => {
@@ -192,7 +203,8 @@ const LAYERS = [
       const y = 1246 + i * 28 + r() * 12
       const len = 90 + r() * 230
       const x = 90 + r() * (W - 200 - len)
-      out.push(stroke(line(x, y, x + len, y + (r() - 0.5) * 8, 14, r, 3), TEAL, 0, r, i * 320))
+      const tone = [TEAL_D, TEAL, TEAL_L, TEAL_LL, MIXED_SEA][i % 5]
+      out.push(stroke(line(x, y, x + len, y + (r() - 0.5) * 8, 14, r, 3), tone, 0, r, i * 320))
     }
     return out
   },
@@ -203,7 +215,8 @@ const LAYERS = [
     anchors.forEach(([x, y], i) => {
       for (let k = 0; k < 4; k++) {
         const yy = y + k * 62 + r() * 16
-        out.push(stroke(line(x - 46 - r() * 30, yy, x + 46 + r() * 30, yy + 5, 12, r, 6), SLATE, 0, r, (i * 4 + k) * 260))
+        const tone = [SLATE_D, SLATE, SLATE_L, SLATE_LL][k % 4]
+        out.push(stroke(line(x - 46 - r() * 30, yy, x + 46 + r() * 30, yy + 5, 12, r, 6), tone, 0, r, (i * 4 + k) * 260))
       }
     })
     return out
@@ -211,7 +224,7 @@ const LAYERS = [
   // 9 — the jetty you are standing on
   (r) => [
     stroke(line(60, 1566, 706, 1502, 50, r, 4), GRAPHITE, 1, r, 0),
-    stroke(line(60, 1612, 706, 1548, 50, r, 4), GRAPHITE, 0, r, 1500),
+    stroke(line(60, 1612, 706, 1548, 50, r, 4), GRAPHITE_L, 0, r, 1500),
     ...[[140, 1600], [320, 1584], [500, 1566], [672, 1548]].map(([x, y], i) =>
       stroke(line(x, y, x + 8, y + 250, 22, r, 4), GRAPHITE, 1, r, 2600 + i * 700),
     ),
@@ -222,24 +235,26 @@ const LAYERS = [
     const at = [[420, 520], [520, 470], [640, 540], [1740, 470], [1840, 520]]
     at.forEach(([x, y], i) => {
       const s = 26 + r() * 16
-      out.push(stroke(arc(x - s, y, s, s * 0.62, Math.PI * 0.15, Math.PI * 0.85, 14, r, 2), INK, 0, r, i * 500))
-      out.push(stroke(arc(x + s, y, s, s * 0.62, Math.PI * 0.15, Math.PI * 0.85, 14, r, 2), INK, 0, r, i * 500 + 250))
+      const tone = i % 3 === 2 ? INK_LL : i % 3 === 1 ? INK_L : INK_D
+      out.push(stroke(arc(x - s, y, s, s * 0.62, Math.PI * 0.15, Math.PI * 0.85, 14, r, 2), tone, 0, r, i * 500))
+      out.push(stroke(arc(x + s, y, s, s * 0.62, Math.PI * 0.15, Math.PI * 0.85, 14, r, 2), tone, 0, r, i * 500 + 250))
     })
     return out
   },
   // 11 — the shore in front
   (r) => [
     stroke(through([[0, 1904], [230, 1856], [470, 1902], [700, 1868], [900, 1918]], 26, r, 7), ASH, 2, r, 0),
-    stroke(through([[0, 1976], [300, 1942], [620, 1986], [900, 1958]], 24, r, 6), ASH, 1, r, 2400),
+    stroke(through([[0, 1976], [300, 1942], [620, 1986], [900, 1958]], 24, r, 6), ASH_L, 1, r, 2400),
+    stroke(through([[120, 1930], [420, 1900], [760, 1944]], 20, r, 5), ASH_LL, 0, r, 4200),
   ],
   // 12 — someone on the jetty, and a rope to the boat
   (r) => [
-    stroke(arc(300, 1452, 30, 32, 0, Math.PI * 2, 40, r, 3), VIOLET, 1, r, 0),
+    stroke(arc(300, 1452, 30, 32, 0, Math.PI * 2, 40, r, 3), MIXED_ROSE, 1, r, 0),
     stroke(line(300, 1484, 302, 1560, 18, r, 3), VIOLET, 1, r, 900),
-    stroke(line(258, 1512, 344, 1508, 16, r, 3), VIOLET, 0, r, 1500),
+    stroke(line(258, 1512, 344, 1508, 16, r, 3), VIOLET_L, 0, r, 1500),
     stroke(line(302, 1560, 274, 1594, 12, r, 3), VIOLET, 1, r, 2000),
     stroke(line(302, 1560, 330, 1594, 12, r, 3), VIOLET, 1, r, 2400),
-    stroke(through([[344, 1508], [520, 1560], [700, 1400], [612, 1244]], 30, r, 5), VIOLET, 0, r, 2900),
+    stroke(through([[344, 1508], [520, 1560], [700, 1400], [612, 1244]], 30, r, 5), VIOLET_L, 0, r, 2900),
   ],
 ]
 
@@ -261,35 +276,47 @@ function signatureStrokes(seed) {
   return out
 }
 
-// ------------------------------------------------------------ palette fit
+// ---------------------------------------------------------- colour check
 
 /**
- * The server now refuses any colour a turn wasn't offered, so the scene has to
- * bend to the palette rather than the other way round. Each intended colour is
- * swapped for the nearest one actually available — which is also what a real
- * player does when the colour they wanted isn't in the box.
+ * Every colour is checked against what the ledger will actually accept, read
+ * from the ledger itself rather than assumed. A silent nearest-match swap would
+ * hide the one thing worth knowing — whether the scene was drawable under the
+ * real rules.
  */
-const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+const GAMUT = { minS: 18, maxS: 72, minL: 28, maxL: 72 }
 
-function nearest(hex, offered) {
-  if (offered.includes(hex)) return hex
-  const [r0, g0, b0] = rgb(hex)
-  let best = offered[0]
-  let bestD = Infinity
-  for (const cand of offered) {
-    const [r, g, b] = rgb(cand)
-    // Weighted to match how the eye trades off the channels.
-    const d = 2 * (r - r0) ** 2 + 4 * (g - g0) ** 2 + 3 * (b - b0) ** 2
-    if (d < bestD) {
-      bestD = d
-      best = cand
-    }
-  }
-  return best
+function hexToSl(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+  const mx = Math.max(r, g, b)
+  const mn = Math.min(r, g, b)
+  const l = (mx + mn) / 2
+  const d = mx - mn
+  const sat = d === 0 ? 0 : l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn)
+  return { s: sat * 100, l: l * 100 }
 }
 
-const fitToPalette = (strokes, offered) =>
-  strokes.map((st) => ({ ...st, color: nearest(st.color, offered) }))
+const inGamut = (hex) => {
+  const { s, l } = hexToSl(hex)
+  return s >= GAMUT.minS && s <= GAMUT.maxS && l >= GAMUT.minL && l <= GAMUT.maxL
+}
+
+async function legalColours() {
+  const res = await fetch(`${URL_BASE}/rest/v1/palette_colors?select=hex`, {
+    headers: { apikey: KEY, Authorization: `Bearer ${KEY}` },
+  })
+  if (!res.ok) throw new Error(`palette: ${await res.text()}`)
+  return new Set((await res.json()).map((r) => r.hex.toUpperCase()))
+}
+
+function assertDrawable(strokes, palette, slot) {
+  for (const st of strokes) {
+    const hex = st.color.toUpperCase()
+    if (!palette.has(hex) && !inGamut(hex)) {
+      throw new Error(`slot ${slot}: ${hex} is neither a palette colour nor in gamut`)
+    }
+  }
+}
 
 // -------------------------------------------------------------------- wire
 
@@ -342,6 +369,9 @@ async function createSignature(strokes, deviceKey) {
 
 // -------------------------------------------------------------------- main
 
+const PALETTE = await legalColours()
+console.log(`ledger offers ${PALETTE.size} colours, plus any hue inside the gamut`)
+
 const hands = []
 for (let i = 0; i < 12; i++) {
   const deviceKey = `seed-hand-${String(i + 1).padStart(2, '0')}-${Date.now().toString(36)}`
@@ -375,8 +405,12 @@ console.log(`claimed slots ${claims.map((c) => c.slot).join(', ')} on ${canvasId
 let totalInk = 0
 for (const claim of claims.sort((a, b) => a.slot - b.slot)) {
   const rand = mulberry32(0xc0ffee + claim.slot * 7919)
-  const strokes = fitToPalette(LAYERS[claim.slot - 1](rand), claim.palette)
-  const swapped = strokes.filter((s, i) => s.color !== LAYERS[claim.slot - 1](mulberry32(0xc0ffee + claim.slot * 7919))[i].color).length
+  const strokes = LAYERS[claim.slot - 1](rand)
+  assertDrawable(strokes, PALETTE, claim.slot)
+  const mixed = strokes.filter((s) => !PALETTE.has(s.color.toUpperCase())).length
+  const tinted = strokes.filter(
+    (s) => PALETTE.has(s.color.toUpperCase()) && !claim.palette.includes(s.color),
+  ).length
   const ink = strokes.reduce((n, s) => n + s.ink, 0)
   totalInk += ink
   if (ink > INK_BUDGET) {
@@ -391,8 +425,8 @@ for (const claim of claims.sort((a, b) => a.slot - b.slot)) {
   console.log(
     `slot ${String(claim.slot).padStart(2)} — ${String(strokes.length).padStart(3)} strokes, ` +
       `${String(ink).padStart(5)} ink (${Math.round((ink / INK_BUDGET) * 100)}% of budget)` +
-      `, palette ${String(claim.palette.length).padStart(2)}` +
-      (swapped ? `, ${swapped} colour${swapped === 1 ? '' : 's'} swapped` : ''),
+      (tinted ? `, ${tinted} tint/shade` : '') +
+      (mixed ? `, ${mixed} mixed` : ''),
   )
 }
 
