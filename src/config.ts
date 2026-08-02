@@ -49,16 +49,25 @@ export const MASTER_PALETTE = [
 export const PEN_WIDTHS = [3.5, 9, 20] as const
 
 /**
- * Palette inheritance. The brief says "the colours already used on the canvas,
- * plus two new ones" — which quietly assumes slot 1 used several colours. When
- * an opening layer is drawn entirely in one colour, that rule hands slot 2 a
- * three-swatch box, and to a new player that reads as broken rather than as a
- * constraint. The floor keeps the cohesion mechanic without the cliff.
+ * Palette inheritance — currently off.
  *
- * Set PALETTE_MIN to 0 for the brief's literal behaviour.
+ * The brief made it the headline cohesion mechanic: each player gets the
+ * colours already on the canvas plus two new ones. Two things argued it down.
+ * It collapses under a burst of arrivals anyway, because the palette is fixed
+ * at claim time and inherits from what has been *submitted* — twelve people who
+ * all claim before anyone submits are each offered everything regardless. And
+ * the real constraint was never *which* of the sixteen: it is that all sixteen
+ * are hand-picked muted tones that cannot clash badly. Restricting the subset
+ * was a second-order rule on top of an already-strong one, and it cost the
+ * twelfth player their range for very little.
+ *
+ * PALETTE_MIN = 16 means "top every player up to the full set", i.e. off. Drop
+ * it to 6 to bring inheritance back with a floor, or 0 for the brief's literal
+ * rule. `inherited_palette()` in the database carries the same number and both
+ * must agree — the server rejects colours a turn was not offered.
  */
 export const PALETTE_NEW_PER_SLOT = 2
-export const PALETTE_MIN = 6
+export const PALETTE_MIN = 16
 
 export const DEFAULT_TUNING = {
   /**

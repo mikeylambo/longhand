@@ -56,11 +56,19 @@ about whether it saved.
 **Identity** — a drawn signature. No username field anywhere, and no way to
 write one.
 
-**Palette inheritance** — every player after slot 1 gets the colours already on
-the canvas plus two new ones, offset by the canvas id so two canvases drift
-differently. The brief calls this the highest-leverage cohesion mechanic in the
-design and it is live: a slot-1 canvas offers all 16 swatches, and a canvas with
-three colours on it offers five.
+**Every player gets all sixteen colours.** Palette inheritance is built and
+kept, but switched off — `PALETTE_MIN` in `src/config.ts` and `p_floor` on
+`inherited_palette()` are the switch, and the two must agree because the server
+rejects colours a turn was not offered. 16 = off, 6 = on with a floor, 0 = the
+brief's literal rule.
+
+It came off for two reasons. It never worked under a burst of arrivals: the
+palette is fixed at claim time, correctly, but inherits from what has been
+*submitted*, so twelve people arriving on a shared link were each offered
+everything regardless. And the constraint that actually produces cohesion is
+that all sixteen are hand-picked muted tones which cannot clash badly —
+rationing which of them each player may touch was a second-order rule that cost
+the last players their range for very little.
 
 **The ledger** (`supabase/migrations/0001_ledger.sql`) — strokes are vectors,
 never pixels. Append-only is enforced by a database trigger, not by application
