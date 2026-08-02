@@ -65,10 +65,13 @@ export const DEFAULT_TUNING = {
    * Total stroke length, in logical px, for one turn. The pen runs out.
    *
    * The brief locked this at 4000. Milestone 1 measured a single arc across
-   * the sheet at 3076 — one and a half gestures per player — so it was raised
-   * to 14000 pending a real playtest. Tune it *down* until it bites.
+   * the sheet at 3076 — one and a half gestures per player — so it went to
+   * 14000, then to 10000 once there were real numbers to tune against: a
+   * stick figure at phone scale costs ~4300, and one dense scribbled stroke
+   * from a live layer cost 10909. 10000 buys a considered contribution and
+   * makes a careless one cost something.
    */
-  inkBudget: 14000,
+  inkBudget: 10000,
   /** Screen speed (css px/ms) at which the pen reaches its thinnest. */
   speedRef: 1.7,
   /** Width multiplier at max speed / at rest. */

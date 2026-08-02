@@ -2,7 +2,7 @@ import type { Stroke } from '../engine/types'
 import { drawStroke, renderLayers } from '../engine/render'
 import { buildTimeline, paintRange } from '../engine/timelapse'
 import { decodeLayer, encodeLayer } from '../engine/codec'
-import { CANVAS_H, CANVAS_W, MASTER_PALETTE, PAPER, PEN_WIDTHS } from '../config'
+import { MASTER_PALETTE, PAPER, PEN_WIDTHS } from '../config'
 
 /**
  * Replay exactness.
@@ -18,6 +18,11 @@ import { CANVAS_H, CANVAS_W, MASTER_PALETTE, PAPER, PEN_WIDTHS } from '../config
  * out when a canvas closes, by which point every canvas is subtly wrong.
  *
  * These checks are pixel-exact on purpose. "Looks the same" is not a result.
+ *
+ * Every check runs at BOTH sheet shapes. A canvas stores the dimensions it was
+ * opened at and renders against those forever, so the square default and the
+ * 2048×1536 canvases already in the archive are two live code paths, not one
+ * current and one historical.
  */
 
 export interface Check {
@@ -27,6 +32,18 @@ export interface Check {
   total: number
   pass: boolean
 }
+
+export interface Shape {
+  label: string
+  width: number
+  height: number
+}
+
+/** The square default, and the shape canvases opened before it existed. */
+export const SHAPES: Shape[] = [
+  { label: '2048×2048', width: 2048, height: 2048 },
+  { label: '2048×1536', width: 2048, height: 1536 },
+]
 
 // ------------------------------------------------------------------ fixtures
 
@@ -47,7 +64,11 @@ function rng(seed: number): () => number {
  * and broad widths in the same layer, and coordinates carrying the same one and
  * two decimal rounding the capture path applies.
  */
-function fixtureLayers(count: number): { slotIndex: number; strokes: Stroke[] }[] {
+function fixtureLayers(
+  count: number,
+  width: number,
+  height: number,
+): { slotIndex: number; strokes: Stroke[] }[] {
   const rand = rng(0x10ada11)
   const layers: { slotIndex: number; strokes: Stroke[] }[] = []
 
@@ -65,8 +86,8 @@ function fixtureLayers(count: number): { slotIndex: number; strokes: Stroke[] }[
       // code path (an arc, not a curve).
       const n = si % 5 === 4 ? 1 : 12 + Math.floor(rand() * 60)
       // Deliberately start some strokes off the sheet so clipping is exercised.
-      const ox = -200 + rand() * (CANVAS_W + 400)
-      const oy = -200 + rand() * (CANVAS_H + 400)
+      const ox = -200 + rand() * (width + 400)
+      const oy = -200 + rand() * (height + 400)
       let x = ox
       let y = oy
 
@@ -107,21 +128,25 @@ function fixtureLayers(count: number): { slotIndex: number; strokes: Stroke[] }[
  * app actually draws on. Mixing the two made this suite report a 5.9% pixel
  * divergence that existed only inside the test.
  */
-function surface(scale: number): {
-  cv: HTMLCanvasElement
-  ctx: CanvasRenderingContext2D
-} {
+function surface(
+  width: number,
+  height: number,
+  scale: number,
+): { cv: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
   const cv = document.createElement('canvas')
-  cv.width = Math.round(CANVAS_W * scale)
-  cv.height = Math.round(CANVAS_H * scale)
+  cv.width = Math.round(width * scale)
+  cv.height = Math.round(height * scale)
   const ctx = cv.getContext('2d')!
   ctx.setTransform(scale, 0, 0, scale, 0, 0)
   ctx.fillStyle = PAPER
-  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H)
+  ctx.fillRect(0, 0, width, height)
   return { cv, ctx }
 }
 
-function diff(a: HTMLCanvasElement, b: HTMLCanvasElement): { differing: number; total: number } {
+function diff(
+  a: HTMLCanvasElement,
+  b: HTMLCanvasElement,
+): { differing: number; total: number } {
   const total = a.width * a.height
   if (a.width !== b.width || a.height !== b.height) {
     return { differing: total, total }
@@ -143,130 +168,136 @@ function diff(a: HTMLCanvasElement, b: HTMLCanvasElement): { differing: number; 
   return { differing, total }
 }
 
-const check = (
-  name: string,
-  detail: string,
-  d: { differing: number; total: number },
-): Check => ({ name, detail, ...d, pass: d.differing === 0 })
-
 // ------------------------------------------------------------------- checks
 
-export function runSelfTest(scale = 1): { checks: Check[]; ok: boolean } {
-  const layers = fixtureLayers(12)
+function checksFor(shape: Shape, scale: number): Check[] {
+  const { width, height, label } = shape
+  const layers = fixtureLayers(12, width, height)
   const allStrokes = layers.map((l) => l.strokes)
   const checks: Check[] = []
 
+  const add = (
+    name: string,
+    detail: string,
+    d: { differing: number; total: number },
+  ) =>
+    checks.push({
+      name: `${label} · ${name}`,
+      detail,
+      ...d,
+      pass: d.differing === 0,
+    })
+
   // 1. The codec must be lossless. Points are already rounded at capture, so
   //    encode/decode has nothing left to round away — prove it, don't assume.
-  const encoded = allStrokes.map((s) => encodeLayer(s, CANVAS_W, CANVAS_H))
+  const encoded = allStrokes.map((s) => encodeLayer(s, width, height))
   const decoded = encoded.map(decodeLayer)
-  const lossless =
-    JSON.stringify(allStrokes) === JSON.stringify(decoded) ? 0 : 1
-  checks.push({
-    name: 'codec is lossless',
-    detail: 'decode(encode(strokes)) deep-equals strokes',
-    differing: lossless,
-    total: 1,
-    pass: lossless === 0,
-  })
+  add(
+    'codec is lossless',
+    'decode(encode(strokes)) deep-equals strokes',
+    {
+      differing: JSON.stringify(allStrokes) === JSON.stringify(decoded) ? 0 : 1,
+      total: 1,
+    },
+  )
 
   // 2. Re-encoding a decoded layer must be byte-identical, or the ledger drifts
   //    every time a layer is read and written back.
-  const reencoded =
-    JSON.stringify(encoded) ===
-    JSON.stringify(decoded.map((s) => encodeLayer(s, CANVAS_W, CANVAS_H)))
-      ? 0
-      : 1
-  checks.push({
-    name: 'encoding is stable',
-    detail: 'encode(decode(encode(x))) is byte-identical to encode(x)',
-    differing: reencoded,
+  add('encoding is stable', 'encode(decode(encode(x))) is byte-identical', {
+    differing:
+      JSON.stringify(encoded) ===
+      JSON.stringify(decoded.map((s) => encodeLayer(s, width, height)))
+        ? 0
+        : 1,
     total: 1,
-    pass: reencoded === 0,
   })
 
-  // 3. The renderer must be deterministic before anything else is meaningful.
-  const once = renderLayers(CANVAS_W, CANVAS_H, allStrokes, { scale })
-  const twice = renderLayers(CANVAS_W, CANVAS_H, allStrokes, { scale })
-  checks.push(
-    check('render is deterministic', 'same vectors rendered twice', diff(once, twice)),
-  )
+  // 3. The encoded layer must carry the shape it was drawn against, or a
+  //    renderer has nothing to fall back on but a client constant.
+  add('encoded layer records its sheet', 'w and h survive the round trip', {
+    differing: encoded.every((e) => e.w === width && e.h === height) ? 0 : 1,
+    total: 1,
+  })
 
-  // 4. What was stored must reproduce what was drawn. This is the whole promise
+  // 4. The renderer must be deterministic before anything else is meaningful.
+  const once = renderLayers(width, height, allStrokes, { scale })
+  const twice = renderLayers(width, height, allStrokes, { scale })
+  add('render is deterministic', 'same vectors rendered twice', diff(once, twice))
+
+  // 5. What was stored must reproduce what was drawn. This is the whole promise
   //    of storing vectors instead of pixels.
-  const fromLedger = renderLayers(CANVAS_W, CANVAS_H, decoded, { scale })
-  checks.push(
-    check(
-      'ledger round-trip is exact',
-      'render(decode(encode(x))) vs render(x)',
-      diff(once, fromLedger),
-    ),
+  add(
+    'ledger round-trip is exact',
+    'render(decode(encode(x))) vs render(x)',
+    diff(once, renderLayers(width, height, decoded, { scale })),
   )
 
-  // 5. The timelapse walked to the end must equal the archived snapshot. If it
+  // 6. The timelapse walked to the end must equal the archived snapshot. If it
   //    does not, the video and the print disagree.
   const timeline = buildTimeline(layers)
-  const whole = surface(scale)
+  const whole = surface(width, height, scale)
   paintRange(whole.ctx, timeline, 0, timeline.total)
-  checks.push(
-    check(
-      'timelapse end-state matches snapshot',
-      'paintRange(0, total) vs one-shot render',
-      diff(once, whole.cv),
-    ),
+  add(
+    'timelapse end-state matches snapshot',
+    'paintRange(0, total) vs one-shot render',
+    diff(once, whole.cv),
   )
 
-  // 6. And it must not matter how many steps the scrub took to get there —
+  // 7. And it must not matter how many steps the scrub took to get there —
   //    a viewer who drags the slider must land on the same image as one who
-  //    lets it play.
+  //    lets it play, or as the video export.
   for (const steps of [2, 7, 113]) {
-    const s = surface(scale)
+    const s = surface(width, height, scale)
     for (let i = 1; i <= steps; i++) {
-      const from = Math.round(((i - 1) / steps) * timeline.total)
-      const to = Math.round((i / steps) * timeline.total)
-      paintRange(s.ctx, timeline, from, to)
+      paintRange(
+        s.ctx,
+        timeline,
+        Math.round(((i - 1) / steps) * timeline.total),
+        Math.round((i / steps) * timeline.total),
+      )
     }
-    checks.push(
-      check(
-        `timelapse in ${steps} steps matches snapshot`,
-        'incremental compositing must not accumulate error',
-        diff(once, s.cv),
-      ),
+    add(
+      `timelapse in ${steps} steps matches snapshot`,
+      'incremental compositing must not accumulate error',
+      diff(once, s.cv),
     )
   }
 
-  // 7. Layers composited one at a time must equal all layers in one pass —
+  // 8. Layers composited one at a time must equal all layers in one pass —
   //    otherwise "your layer alone" and the full canvas are drawn by different
   //    maths, and hiding a layer would shift the ones around it.
-  const stacked = surface(scale)
-  for (const layer of layers) for (const st of layer.strokes) drawStroke(stacked.ctx, st)
-  checks.push(
-    check(
-      'layer-by-layer equals one pass',
-      'compositing is associative across layers',
-      diff(once, stacked.cv),
-    ),
+  const stacked = surface(width, height, scale)
+  for (const layer of layers)
+    for (const st of layer.strokes) drawStroke(stacked.ctx, st)
+  add(
+    'layer-by-layer equals one pass',
+    'compositing is associative across layers',
+    diff(once, stacked.cv),
   )
 
-  // 8. Hiding a layer must remove exactly that layer and disturb nothing else:
-  //    the canvas without layer 7 must equal a render of every layer but 7.
-  const hidden = new Set(layers.map((l) => l.slotIndex).filter((i) => i !== 7))
+  // 9. Hiding a layer must remove exactly that layer and disturb nothing else.
+  const visible = new Set(
+    layers.map((l) => l.slotIndex).filter((i) => i !== 7),
+  )
   const withoutSeven = renderLayers(
-    CANVAS_W,
-    CANVAS_H,
+    width,
+    height,
     layers.filter((l) => l.slotIndex !== 7).map((l) => l.strokes),
     { scale },
   )
-  const viaTimeline = surface(scale)
-  const tl7 = buildTimeline(layers, hidden)
+  const viaTimeline = surface(width, height, scale)
+  const tl7 = buildTimeline(layers, visible)
   paintRange(viaTimeline.ctx, tl7, 0, tl7.total)
-  checks.push(
-    check(
-      'hiding a layer is surgical',
-      'timeline without slot 7 vs render without slot 7',
-      diff(withoutSeven, viaTimeline.cv),
-    ),
+  add(
+    'hiding a layer is surgical',
+    'timeline without slot 7 vs render without slot 7',
+    diff(withoutSeven, viaTimeline.cv),
   )
 
+  return checks
+}
+
+export function runSelfTest(scale = 1): { checks: Check[]; ok: boolean } {
+  const checks = SHAPES.flatMap((shape) => checksFor(shape, scale))
   return { checks, ok: checks.every((c) => c.pass) }
 }

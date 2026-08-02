@@ -148,8 +148,10 @@ viewport: a single arc across the sheet consumed **3076 of 4000**. The second
 stroke exhausted the budget and the pen refused to start a third. That is one
 and a half gestures per player — not a contribution, a twitch.
 
-Now set to **14,000**, which leaves real headroom (a three-stroke opening layer
-lands around 1,900). Tune it *down* until it bites, against strangers. `?ink=N`.
+Now **10,000**, tuned against measurements rather than a guess: a stick figure
+at phone scale costs ~4,300, and one dense scribbled stroke from a live layer
+cost 10,909. So a considered contribution fits comfortably and a careless one
+costs the whole turn. `?ink=N` to try another.
 
 **A 4:3 landscape sheet wastes about 45% of a portrait phone screen.** At fit,
 the sheet is a band across the middle with dead space above and below. It's
@@ -257,18 +259,16 @@ still render 4:3, verified.
 ## Ink, measured
 
 The meter is wired to real consumption. Per-stroke cost is logged to the console
-in dev, and at the current 14,000 budget:
+in dev:
 
 | drawing | strokes | ink | of budget |
 |---|---|---|---|
-| stick figure, phone scale | 8 | 4,335 | 31% |
-| one dense scribbled stroke | 1 | 10,909 | 78% |
+| stick figure, phone scale | 8 | 4,335 | 43% |
+| one dense scribbled stroke | 1 | 10,909 | over |
 
-So a considered contribution runs about 4,000–5,000 and a careless one can eat
-the lot in a single gesture — which is roughly the right shape of incentive.
-14,000 allows about three figures' worth. If contributions should be tighter and
-more deliberate, 8,000–10,000 is the range to try; `?ink=N` to feel it before
-committing.
+(Percentages against the 10,000 budget now in force.) A considered contribution
+runs about 4,000–5,000, so the budget allows roughly two of them — and the
+scribble that cost 10,909 would now run dry mid-stroke, which is the point.
 
 The meter itself was 3px tall, which made a third of the budget draining look
 like nothing happening. Now 6px.
@@ -294,12 +294,47 @@ browsers — which is the brief's success criterion, not an obstacle to route
 around. Run without Supabase credentials for a solo relay when you only want to
 exercise the surface.
 
+## The timelapse export
+
+`Save the timelapse` on a canvas page records an MP4 — H.264 where the browser
+can mux it, WebM as the fallback, and the filename matches whatever was actually
+produced rather than lying about it.
+
+It is the same `buildTimeline`/`paintRange` walk the in-app scrubber uses, which
+`selftest` proves lands on pixels identical to the archived snapshot however
+many steps it takes. So the video, the scrubber and the print cannot disagree.
+
+Fixed at ~20s regardless of layer count — position along the walk is normalised
+— because an artifact that runs 8 seconds for one canvas and 40 for another is
+not a format. The last 3.5s rest on the finished piece while a caption fades in
+over the paper margin: the seed word and the number of hands, so the file
+carries its own context when it turns up somewhere with no page around it.
+
+Recording is real-time and driven by `requestAnimationFrame`, which browsers
+freeze in a background tab. Unguarded that yields a file that is mostly one held
+frame with no error anywhere, so the export refuses to start on a hidden tab and
+aborts if the tab goes away mid-record.
+
+Measured on the seeded canvas: `video/mp4;codecs=avc1.42E01E`, 379 KB, 20.02s,
+12 layers, 2048×2048.
+
+`tests/video.spec.ts` asserts a real file comes out. It lives in Playwright and
+not in the app preview for a concrete reason — Playwright's page is genuinely
+visible, so it is the only place the recording path can be exercised at all.
+
+## Seeding a canvas to look at
+
+`node scripts/seed-canvas.mjs` fills one canvas with twelve fixture layers from
+twelve distinct signatures, each claiming a turn and submitting against it
+through the real endpoints. What lands in the ledger is shaped exactly like
+player data; the only thing faked is the hands. Every layer comes in under the
+10,000 budget, which is also a useful check that the budget is survivable.
+
 ## Not built yet
 
-The server-side MP4 render. The gallery, the canvas page and the personal cards
-all render from stroke vectors at request time, which is fast and always
-current, but a real downloadable video needs a rendering worker — that is its
-own piece of work rather than a corner of this one.
+A *server-side* render. The export above runs in the player's browser, which is
+fine for someone saving their own canvas but no use for generating an OG preview
+image or a video for a canvas nobody has opened. That needs a worker.
 
 Notifications (Milestone 5). Accounts, the world map, prints, school accounts —
 all explicitly out of scope for v1.

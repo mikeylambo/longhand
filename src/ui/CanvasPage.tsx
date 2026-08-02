@@ -4,6 +4,7 @@ import { SLOTS_PER_CANVAS } from '../config'
 import { loadCanvasForViewing } from '../data/session'
 import { LEDGER_ENABLED } from '../lib/supabase'
 import { Replay, type ReplayLayer } from './Replay'
+import { renderTimelapseVideo, videoExportSupported } from '../engine/video'
 
 interface Props {
   canvasId: string
@@ -39,6 +40,32 @@ export function CanvasPage({ canvasId }: Props) {
   const [state, setState] = useState<Loaded | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [videoProgress, setVideoProgress] = useState<number | null>(null)
+  const [videoError, setVideoError] = useState<string | null>(null)
+
+  const saveTimelapse = async (loaded: Loaded) => {
+    setVideoError(null)
+    setVideoProgress(0)
+    try {
+      const { blob, extension } = await renderTimelapseVideo({
+        layers: loaded.layers,
+        width: loaded.width,
+        height: loaded.height,
+        seed: loaded.seed,
+        hands: loaded.layers.length,
+        onProgress: setVideoProgress,
+      })
+      const url = URL.createObjectURL(blob)
+      download(url, `longhand-${loaded.seed}.${extension}`)
+      // Revoked late: Safari cancels an in-flight download if the object URL
+      // goes away too soon.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (e) {
+      setVideoError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setVideoProgress(null)
+    }
+  }
 
   useEffect(() => {
     if (!LEDGER_ENABLED) {
@@ -110,6 +137,17 @@ export function CanvasPage({ canvasId }: Props) {
 
         <div className="review-caption">Take it with you</div>
         <div className="row">
+          {videoExportSupported() && (
+            <button
+              className="linkbtn"
+              disabled={videoProgress !== null}
+              onClick={() => void saveTimelapse(state)}
+            >
+              {videoProgress === null
+                ? 'Save the timelapse'
+                : `Rendering… ${Math.round(videoProgress * 100)}%`}
+            </button>
+          )}
           <button
             className="linkbtn"
             onClick={() =>
@@ -137,6 +175,12 @@ export function CanvasPage({ canvasId }: Props) {
             {copied ? 'Link copied' : 'Share'}
           </button>
         </div>
+        {videoProgress !== null && (
+          <div className="stat">
+            Recording in real time — about 20 seconds. Keep this tab in front.
+          </div>
+        )}
+        {videoError && <div className="stat">Timelapse failed: {videoError}</div>}
 
         <div className="review-caption">Every hand, alone</div>
         <div className="cards">
