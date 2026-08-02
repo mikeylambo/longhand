@@ -273,6 +273,25 @@ scribble that cost 10,909 would now run dry mid-stroke, which is the point.
 The meter itself was 3px tall, which made a third of the budget draining look
 like nothing happening. Now 6px.
 
+## The rules are the server's, not the client's
+
+Two game rules used to live only in the UI, which made them suggestions:
+
+**Colour.** `submit_turn` refuses any colour the turn was not offered, checked
+against the palette stored on the turn at claim time. A mixed layer is refused
+whole, not filtered.
+
+**Ink.** `layer_ink()` recomputes stroke length in Postgres from the submitted
+points, and a layer over the canvas's budget is refused. The client's claimed
+figure is never trusted — `layers.ink_used` is the server's number. Verified: a
+known 1000px line measures exactly 1000, a live layer the client measured at
+2246 stored as 2246, and a client claiming 999,999 for a 1000px line had its
+claim discarded.
+
+`canvases.ink_budget` travels with the canvas for the same reason `width` and
+`height` do — a closed canvas has to stay judged by the rules it was played
+under, and the server must not depend on a constant in a JS bundle.
+
 ## Known gaps
 
 **The device key is a bearer token in local storage.** Clearing it loses your
@@ -282,6 +301,18 @@ accounts, not fine for a launch.
 **No rate limit.** `submit_turn` caps a layer at 2 MB and 600 strokes and a turn
 must be claimed first, but nothing throttles repeated claims across many
 signatures.
+
+**Palette inheritance collapses under a burst of arrivals.** The palette is
+fixed at claim time so it cannot shift under someone mid-drawing — which is
+right — but it inherits from what has been *submitted*, not from what has been
+claimed. Twelve people who all claim before anyone submits therefore all get the
+full sixteen colours, and the cohesion mechanic does nothing. Seeding a canvas
+reproduces this exactly: all twelve slots were offered 16.
+
+Staggered arrivals work fine, but a shared link produces precisely the burst
+that defeats it. The fix is a design call, not a one-liner — either inherit from
+live turns as well as submitted layers, or recompute at submit and accept that
+the palette can shift mid-turn. Worth settling before the first real canvas.
 
 **Losing an unsubmitted drawing at 10:00 is harsh.** It is what the brief
 specifies, and the clock is visible throughout — but auto-submitting non-empty

@@ -261,6 +261,36 @@ function signatureStrokes(seed) {
   return out
 }
 
+// ------------------------------------------------------------ palette fit
+
+/**
+ * The server now refuses any colour a turn wasn't offered, so the scene has to
+ * bend to the palette rather than the other way round. Each intended colour is
+ * swapped for the nearest one actually available — which is also what a real
+ * player does when the colour they wanted isn't in the box.
+ */
+const rgb = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+
+function nearest(hex, offered) {
+  if (offered.includes(hex)) return hex
+  const [r0, g0, b0] = rgb(hex)
+  let best = offered[0]
+  let bestD = Infinity
+  for (const cand of offered) {
+    const [r, g, b] = rgb(cand)
+    // Weighted to match how the eye trades off the channels.
+    const d = 2 * (r - r0) ** 2 + 4 * (g - g0) ** 2 + 3 * (b - b0) ** 2
+    if (d < bestD) {
+      bestD = d
+      best = cand
+    }
+  }
+  return best
+}
+
+const fitToPalette = (strokes, offered) =>
+  strokes.map((st) => ({ ...st, color: nearest(st.color, offered) }))
+
 // -------------------------------------------------------------------- wire
 
 const encode = (strokes, w, h) => ({
@@ -328,7 +358,13 @@ for (const hand of hands) {
     p_signature: hand.id,
     p_device_key: hand.deviceKey,
   })
-  claims.push({ ...hand, turnId: turn.id, slot: turn.slot_index, canvasId: canvas.id })
+  claims.push({
+    ...hand,
+    turnId: turn.id,
+    slot: turn.slot_index,
+    canvasId: canvas.id,
+    palette: turn.palette,
+  })
 }
 const canvasId = claims[0].canvasId
 if (!claims.every((c) => c.canvasId === canvasId)) {
@@ -339,7 +375,8 @@ console.log(`claimed slots ${claims.map((c) => c.slot).join(', ')} on ${canvasId
 let totalInk = 0
 for (const claim of claims.sort((a, b) => a.slot - b.slot)) {
   const rand = mulberry32(0xc0ffee + claim.slot * 7919)
-  const strokes = LAYERS[claim.slot - 1](rand)
+  const strokes = fitToPalette(LAYERS[claim.slot - 1](rand), claim.palette)
+  const swapped = strokes.filter((s, i) => s.color !== LAYERS[claim.slot - 1](mulberry32(0xc0ffee + claim.slot * 7919))[i].color).length
   const ink = strokes.reduce((n, s) => n + s.ink, 0)
   totalInk += ink
   if (ink > INK_BUDGET) {
@@ -353,7 +390,9 @@ for (const claim of claims.sort((a, b) => a.slot - b.slot)) {
   })
   console.log(
     `slot ${String(claim.slot).padStart(2)} — ${String(strokes.length).padStart(3)} strokes, ` +
-      `${String(ink).padStart(5)} ink (${Math.round((ink / INK_BUDGET) * 100)}% of budget)`,
+      `${String(ink).padStart(5)} ink (${Math.round((ink / INK_BUDGET) * 100)}% of budget)` +
+      `, palette ${String(claim.palette.length).padStart(2)}` +
+      (swapped ? `, ${swapped} colour${swapped === 1 ? '' : 's'} swapped` : ''),
   )
 }
 
