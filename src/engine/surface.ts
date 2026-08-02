@@ -30,7 +30,24 @@ interface GestureState {
   midX0: number
   midY0: number
   view0: View
+  /** For telling a two-finger tap from a pan. */
+  startedAt: number
+  travel: number
+  lastMidX: number
+  lastMidY: number
+  /**
+   * Recent positions of the sheet, for the throw.
+   *
+   * Velocity is measured across a time window rather than between consecutive
+   * events: two fingers emit two moves per frame, microseconds apart, and
+   * dividing a whole frame's travel by that gap reports a speed nobody moved at.
+   */
+  hist: { t: number; tx: number; ty: number }[]
 }
+
+/** How far back the throw looks, and the fastest it will believe. */
+const VELOCITY_WINDOW_MS = 90
+const MAX_THROW_PX_PER_MS = 4
 
 const dist = (ax: number, ay: number, bx: number, by: number) =>
   Math.hypot(bx - ax, by - ay)
@@ -78,6 +95,9 @@ export class Surface {
   private ro: ResizeObserver
   private destroyed = false
   private locked = false
+  private animating = false
+  private momentum: { vx: number; vy: number } | null = null
+  private lastTwoFingerTap = 0
 
   constructor(host: HTMLElement, opts: SurfaceOptions) {
     this.host = host
@@ -246,17 +266,97 @@ export class Surface {
     return Math.max(this.fitScale * 8, 2)
   }
 
-  private clampView(): void {
+  /** Where the sheet is allowed to sit. Axes narrower than the viewport centre. */
+  private bounds(): { minX: number; maxX: number; minY: number; maxY: number } {
     const w = this.opts.width * this.view.scale
     const h = this.opts.height * this.view.scale
-    this.view.tx =
-      w <= this.cssW
-        ? (this.cssW - w) / 2
-        : Math.min(0, Math.max(this.cssW - w, this.view.tx))
-    this.view.ty =
-      h <= this.cssH
-        ? (this.cssH - h) / 2
-        : Math.min(0, Math.max(this.cssH - h, this.view.ty))
+    const cx = (this.cssW - w) / 2
+    const cy = (this.cssH - h) / 2
+    return {
+      minX: w <= this.cssW ? cx : this.cssW - w,
+      maxX: w <= this.cssW ? cx : 0,
+      minY: h <= this.cssH ? cy : this.cssH - h,
+      maxY: h <= this.cssH ? cy : 0,
+    }
+  }
+
+  /**
+   * Hard clamp, or the elastic one used while a finger is down.
+   *
+   * Stopping dead at the edge is the single most web-feeling thing a pannable
+   * surface can do. Under the finger the sheet gives, with resistance that
+   * grows as it goes; on release it springs back.
+   */
+  private clampView(elastic = false): void {
+    const b = this.bounds()
+    const give = (v: number, lo: number, hi: number) => {
+      if (v < lo) return elastic ? lo - resist(lo - v) : lo
+      if (v > hi) return elastic ? hi + resist(v - hi) : hi
+      return v
+    }
+    const limit = Math.min(this.cssW, this.cssH) * 0.28
+    const resist = (over: number) => (over * limit) / (over + limit)
+    this.view.tx = give(this.view.tx, b.minX, b.maxX)
+    this.view.ty = give(this.view.ty, b.minY, b.maxY)
+  }
+
+  /**
+   * Momentum and spring-back. Runs its own loop rather than riding the paint
+   * loop, so it keeps the transformed-blit path and never triggers a full
+   * vector rebuild per frame.
+   */
+  private startViewAnimation(): void {
+    if (this.animating) return
+    this.animating = true
+
+    const step = () => {
+      if (this.destroyed || this.gesture) {
+        this.animating = false
+        this.momentum = null
+        this.invalidate(true)
+        return
+      }
+
+      let alive = false
+
+      if (this.momentum) {
+        this.view.tx += this.momentum.vx * 16
+        this.view.ty += this.momentum.vy * 16
+        this.momentum.vx *= 0.93
+        this.momentum.vy *= 0.93
+        if (Math.hypot(this.momentum.vx, this.momentum.vy) < 0.015) this.momentum = null
+        else alive = true
+      }
+
+      const b = this.bounds()
+      const tx = Math.min(b.maxX, Math.max(b.minX, this.view.tx))
+      const ty = Math.min(b.maxY, Math.max(b.minY, this.view.ty))
+      if (tx !== this.view.tx || ty !== this.view.ty) {
+        // Out of bounds: kill the throw quickly and pull it home.
+        if (this.momentum) {
+          this.momentum.vx *= 0.55
+          this.momentum.vy *= 0.55
+        }
+        this.view.tx += (tx - this.view.tx) * 0.24
+        this.view.ty += (ty - this.view.ty) * 0.24
+        if (Math.abs(tx - this.view.tx) < 0.4) this.view.tx = tx
+        if (Math.abs(ty - this.view.ty) < 0.4) this.view.ty = ty
+        alive = alive || this.view.tx !== tx || this.view.ty !== ty
+      }
+
+      this.dirty = true
+      this.invalidate()
+
+      if (alive) requestAnimationFrame(step)
+      else {
+        this.animating = false
+        this.momentum = null
+        this.invalidate(true)
+        this.opts.onZoom?.(this.view.scale, this.fitScale)
+      }
+    }
+
+    requestAnimationFrame(step)
   }
 
   // ---------------------------------------------------------------- render
@@ -276,8 +376,9 @@ export class Surface {
     // rebuild until the finger lifts would blank the artwork underneath the
     // stroke in progress. rebuildTurn() resets liveDrawn, so flushLive simply
     // re-commits the finalised part of the live stroke at the new view.
-    // Only a pinch defers, because the transformed blit covers it.
-    if (this.dirty && !this.gesture) this.rebuild()
+    // A pinch or a coasting throw defers, because the transformed blit covers
+    // it and a full vector rebuild per frame would not hold 60fps.
+    if (this.dirty && !this.gesture && !this.animating) this.rebuild()
     this.paint()
   }
 
@@ -346,11 +447,25 @@ export class Surface {
     if (this.drawing) {
       // The tip lives on the display canvas, which is cleared every frame, so
       // the last few samples can keep changing (exit taper, lift-snap) without
-      // leaving a heavier ghost underneath.
-      const s = this.drawing.builder.stroke
-      this.clipped(this.dctx, this.view, (ctx) =>
-        drawSegments(ctx, s, this.liveDrawn, s.pts.length),
-      )
+      // leaving a heavier ghost underneath — and so the lead below can be a
+      // guess that costs nothing when it is wrong.
+      const b = this.drawing.builder
+      const s = b.stroke
+      const lead = b.lead(this.opts.tuning.predictMs, this.opts.tuning.predictMaxPx)
+      this.clipped(this.dctx, this.view, (ctx) => {
+        drawSegments(ctx, s, this.liveDrawn, s.pts.length)
+        if (lead) {
+          const last = s.pts[s.pts.length - 1]
+          ctx.strokeStyle = s.color
+          ctx.lineCap = 'round'
+          ctx.lineJoin = 'round'
+          ctx.lineWidth = Math.max(0.2, lead.w)
+          ctx.beginPath()
+          ctx.moveTo(last.x, last.y)
+          ctx.lineTo(lead.x, lead.y)
+          ctx.stroke()
+        }
+      })
     }
   }
 
@@ -491,10 +606,28 @@ export class Surface {
     }
 
     if (this.gesture && (e.pointerId === this.gesture.a || e.pointerId === this.gesture.b)) {
+      const g = this.gesture
       this.gesture = null
-      this.clampView()
-      this.invalidate(true)
-      this.opts.onZoom?.(this.view.scale, this.fitScale)
+
+      if (this.wasTap(g)) {
+        // Two-finger tap undoes; two-finger double-tap fits. Single-tap
+        // gestures are deliberately left alone — a one-finger tap is a dot,
+        // and stealing it for zoom would mean every double-tap left two.
+        const now = performance.now()
+        const isDouble = now - this.lastTwoFingerTap < 340
+        this.lastTwoFingerTap = isDouble ? 0 : now
+        if (isDouble) this.fit()
+        else this.undo()
+        this.invalidate(true)
+        return
+      }
+
+      // Throw it, unless the gesture was really a zoom — coasting out of a
+      // pinch feels like a slip, not a flick.
+      const v = this.throwVelocity(g)
+      const zoomed = Math.abs(this.view.scale - g.view0.scale) > 0.001
+      this.momentum = !zoomed && Math.hypot(v.vx, v.vy) > 0.08 ? v : null
+      this.startViewAnimation()
       return
     }
     if (this.drawing && this.drawing.id === e.pointerId) {
@@ -561,14 +694,42 @@ export class Surface {
     if (ids.length < 2) return
     const a = this.pointers.get(ids[0])!
     const b = this.pointers.get(ids[1])!
+    const midX = (a.x + b.x) / 2
+    const midY = (a.y + b.y) / 2
+    const now = performance.now()
+    this.momentum = null
     this.gesture = {
       a: ids[0],
       b: ids[1],
       dist0: Math.max(1, dist(a.x, a.y, b.x, b.y)),
-      midX0: (a.x + b.x) / 2,
-      midY0: (a.y + b.y) / 2,
+      midX0: midX,
+      midY0: midY,
       view0: { ...this.view },
+      startedAt: now,
+      travel: 0,
+      lastMidX: midX,
+      lastMidY: midY,
+      hist: [{ t: now, tx: this.view.tx, ty: this.view.ty }],
     }
+  }
+
+  /** Sheet velocity in css px/ms, measured over the window. */
+  private throwVelocity(g: GestureState): { vx: number; vy: number } {
+    const h = g.hist
+    if (h.length < 2) return { vx: 0, vy: 0 }
+    const last = h[h.length - 1]
+    const first = h[0]
+    const dt = last.t - first.t
+    if (dt < 8) return { vx: 0, vy: 0 }
+    let vx = (last.tx - first.tx) / dt
+    let vy = (last.ty - first.ty) / dt
+    const speed = Math.hypot(vx, vy)
+    if (speed > MAX_THROW_PX_PER_MS) {
+      const k = MAX_THROW_PX_PER_MS / speed
+      vx *= k
+      vy *= k
+    }
+    return { vx, vy }
   }
 
   private updateGesture(): void {
@@ -589,8 +750,23 @@ export class Surface {
       tx: midX - k * (g.midX0 - g.view0.tx),
       ty: midY - k * (g.midY0 - g.view0.ty),
     }
-    this.clampView()
+    this.clampView(true)
+
+    // Track the sheet, not the fingers — so the throw matches what actually
+    // moved, including the travel lost to elastic resistance at the edge.
+    const now = performance.now()
+    g.hist.push({ t: now, tx: this.view.tx, ty: this.view.ty })
+    while (g.hist.length > 2 && now - g.hist[0].t > VELOCITY_WINDOW_MS) g.hist.shift()
+
+    g.travel += dist(g.lastMidX, g.lastMidY, midX, midY)
+    g.lastMidX = midX
+    g.lastMidY = midY
     this.dirty = true
+  }
+
+  /** Two fingers down and up again, going nowhere. Procreate's undo. */
+  private wasTap(g: GestureState): boolean {
+    return performance.now() - g.startedAt < 280 && g.travel < 14
   }
 
   private onWheel = (e: WheelEvent) => {

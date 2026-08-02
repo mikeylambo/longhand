@@ -48,6 +48,9 @@ export class StrokeBuilder {
   private lastT = 0
   private t0 = 0
   private speed = 0
+  /** Logical px per ms, smoothed — drives the display-only lead. */
+  private vx = 0
+  private vy = 0
   private w = 0
   private travelled = 0
 
@@ -77,6 +80,35 @@ export class StrokeBuilder {
     return this.started ? this.lastT - this.t0 : 0
   }
 
+  /**
+   * Where the line should appear to be right now, which is not where the last
+   * recorded sample is.
+   *
+   * Two lags stack up between the finger and the ink: the smoothing filter
+   * holds the recorded path behind the raw input, and the recorded path itself
+   * is always at least one frame old. This returns the raw position plus a
+   * short velocity extrapolation, for the display only — it is never recorded,
+   * so a mis-prediction lasts one frame and leaves nothing behind.
+   */
+  lead(predictMs: number, maxPx: number): { x: number; y: number; w: number } | null {
+    if (!this.started || this.stroke.pts.length === 0) return null
+
+    let x = this.rawLx
+    let y = this.rawLy
+    if (predictMs > 0) {
+      const px = this.vx * predictMs
+      const py = this.vy * predictMs
+      const d = Math.hypot(px, py)
+      const k = d > maxPx ? maxPx / d : 1
+      x += px * k
+      y += py * k
+    }
+
+    const last = this.stroke.pts[this.stroke.pts.length - 1]
+    if (Math.hypot(x - last.x, y - last.y) < 0.2) return null
+    return { x, y, w: Math.max(0.2, this.w) }
+  }
+
   add(i: BuilderInput): void {
     if (this.exhausted) return
 
@@ -95,6 +127,11 @@ export class StrokeBuilder {
       return
     }
 
+    const dtRaw = Math.max(1, i.t - this.lastT)
+    const nvx = (i.lx - this.rawLx) / dtRaw
+    const nvy = (i.ly - this.rawLy) / dtRaw
+    this.vx += (nvx - this.vx) * 0.4
+    this.vy += (nvy - this.vy) * 0.4
     this.rawLx = i.lx
     this.rawLy = i.ly
 

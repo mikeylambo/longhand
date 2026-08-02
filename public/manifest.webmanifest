@@ -2,10 +2,21 @@
   "name": "Longhand",
   "short_name": "Longhand",
   "description": "A museum the world fills in, one stranger at a time.",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#E7E0D2",
   "theme_color": "#E7E0D2",
-  "icons": []
+  "categories": ["art", "social"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Take a slot", "url": "/" },
+    { "name": "The gallery", "url": "/gallery" }
+  ]
 }

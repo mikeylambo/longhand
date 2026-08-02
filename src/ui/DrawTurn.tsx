@@ -11,6 +11,7 @@ import {
 import { FitIcon, UndoIcon } from './icons'
 import { Tuner } from './Tuner'
 import { TurnClock } from './TurnClock'
+import { PaletteBar } from './PaletteBar'
 
 interface Props {
   seed: string
@@ -23,6 +24,10 @@ interface Props {
   height: number
   /** Epoch ms this turn runs out, or null when no clock is running. */
   expiresAt: number | null
+  submitting: boolean
+  /** A failed save. Shown over the drawing, which is never discarded. */
+  submitError: string | null
+  onDismissError: () => void
   onSubmit: (layer: Stroke[]) => void
   onExpired: () => void
 }
@@ -35,6 +40,9 @@ export function DrawTurn({
   width,
   height,
   expiresAt,
+  submitting,
+  submitError,
+  onDismissError,
   onSubmit,
   onExpired,
 }: Props) {
@@ -116,10 +124,10 @@ export function DrawTurn({
         <div className="right">
           <button
             className="linkbtn solid"
-            disabled={strokeCount === 0 || expired}
+            disabled={strokeCount === 0 || expired || submitting}
             onClick={() => onSubmit(surfaceRef.current?.getLayer() ?? [])}
           >
-            Finish
+            {submitting ? 'Saving…' : 'Finish'}
           </button>
         </div>
       </header>
@@ -173,6 +181,14 @@ export function DrawTurn({
         {showHint && !expired && (
           <div className="hint">Two fingers to move and zoom</div>
         )}
+        {submitError && !expired && (
+          <div className="banner" role="alert">
+            <span>{submitError}</span>
+            <button className="linkbtn tiny" onClick={onDismissError}>
+              Dismiss
+            </button>
+          </div>
+        )}
         {expired && (
           <div className="expired">
             <div>
@@ -189,17 +205,7 @@ export function DrawTurn({
         )}
       </div>
 
-      <div className="palette">
-        {palette.map((c) => (
-          <button
-            key={c}
-            className={`swatch${c === color ? ' on' : ''}`}
-            style={{ background: c }}
-            onClick={() => setColor(c)}
-            aria-label={c}
-          />
-        ))}
-      </div>
+      <PaletteBar palette={palette} value={color} onChange={setColor} />
     </div>
   )
 }

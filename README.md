@@ -110,6 +110,67 @@ shareable page at `/c/<id>` with the full piece, the scrubbable timelapse, every
 contributor's layer alone, and PNG downloads. `/gallery` lists finished work,
 newest first — no counts, no ranking, no leaderboard, ever.
 
+## Hand feel
+
+The things that decide whether a drawing surface reads as native or as a web
+page. All four are covered by `tests/surface.spec.ts`, which runs in Playwright
+because they depend on requestAnimationFrame actually firing and browsers freeze
+it in a hidden tab.
+
+**Prediction.** Two lags stack between finger and ink: the smoothing filter
+holds the recorded path back, and the recorded path is always a frame old. The
+visible tip is drawn to the raw position plus a short velocity extrapolation —
+about 38 logical px ahead in practice. It is display only, never recorded, so a
+bad guess lasts one frame and leaves nothing behind.
+
+**Inertia and rubber-banding.** A two-finger pan throws and coasts to a stop;
+the sheet gives at the edges with resistance that grows as it goes, and springs
+back on release. Velocity is measured across a 90ms window rather than between
+events, because two fingers emit two moves per frame microseconds apart and
+dividing a frame's travel by that gap reports a speed nobody moved at. Stopping
+dead at the edge was the most web-feeling thing left in the app.
+
+**Two-finger tap undoes. Two-finger double-tap fits.** Single-tap gestures are
+deliberately untouched — a one-finger tap is a dot, so stealing double-tap for
+zoom would leave two dots behind every time.
+
+**A failed save never costs the drawing.** Submitting stays on the drawing
+screen; a rejection appears as a banner over work that is still there, still
+undoable, still submittable. Swapping to an error screen would have thrown away
+a turn over a dropped connection.
+
+## Colour
+
+Sixteen families of five, plus any hue you like.
+
+**Long-press a swatch** to fan out its two shades and two tints — eighty colours
+reached through sixteen, with no second row eating the sheet's vertical space.
+
+**The mix swatch** gives the whole hue wheel with saturation and lightness
+fenced to the range measured from the sixteen (S 18–72, L 28–72). Any colour you
+like, in this world's light. The hue strip itself only shows achievable colours,
+so the constraint is visible rather than enforced by rejection.
+
+There is no hex field, on purpose. A typed colour is a text input, which the
+brief rules out, and an unrestricted one puts a stroke that cannot sit with the
+others into an archive that can never be edited.
+
+`colour_allowed()` enforces exactly the same rule server-side —
+`tests/colour.spec.ts` asserts the client derives byte-identical families to the
+ones stored in `palette_colors`, so the UI can never offer a colour that gets
+refused after the drawing is finished.
+
+## Installing
+
+Real icons, a maskable variant, an apple-touch-icon, and shortcuts — generated
+by `node scripts/make-icons.mjs` so the mark stays in step with the palette.
+
+`public/sw.js` caches the app shell. Deliberately conservative: content-hashed
+assets are cached forever, navigations go network-first so a stale index.html
+can never pin someone to an old bundle, and **nothing from the ledger is ever
+cached** — a canvas that looks finished because it was finished yesterday would
+be a lie. Registered in production only.
+
 ## Rendering model
 
 Three canvases, because redrawing thousands of quadratics per frame is the

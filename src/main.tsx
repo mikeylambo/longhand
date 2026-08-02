@@ -28,3 +28,13 @@ function route(): ReactNode {
 createRoot(document.getElementById('root')!).render(
   <StrictMode>{route()}</StrictMode>,
 )
+
+// Offline shell. Only in production — a service worker in front of the dev
+// server turns every edit into a cache-invalidation puzzle.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      /* an app that works offline is a bonus, never a requirement */
+    })
+  })
+}

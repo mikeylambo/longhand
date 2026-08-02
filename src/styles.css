@@ -42,6 +42,32 @@ button {
   cursor: pointer;
 }
 
+/* Screen changes crossfade with a little lift, rather than cutting. Short
+   enough not to sit between the player and the sheet. */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root) {
+    animation: vt-out 150ms cubic-bezier(0.4, 0, 1, 1) both;
+  }
+
+  ::view-transition-new(root) {
+    animation: vt-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+@keyframes vt-out {
+  to {
+    opacity: 0;
+    transform: scale(0.99);
+  }
+}
+
+@keyframes vt-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
 /* ------------------------------------------------------------------ shell */
 
 .app {
@@ -233,6 +259,36 @@ button {
   transition: opacity 500ms ease;
 }
 
+/* A save that failed, over the drawing that survived it. */
+.banner {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--paper);
+  background: rgba(167, 58, 52, 0.95);
+  box-shadow: 0 6px 18px rgba(27, 26, 23, 0.18);
+  animation: fan-in 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.banner span {
+  flex: 1;
+}
+
+.banner .linkbtn {
+  border-color: rgba(250, 247, 240, 0.5);
+  color: var(--paper);
+  flex: 0 0 auto;
+}
+
 /* ---------------------------------------------------------------- palette */
 
 /* One row that scrolls, not two that stack — the vertical space belongs to the
@@ -263,6 +319,117 @@ button {
 
 .swatch.on {
   box-shadow: 0 0 0 2px var(--chrome), 0 0 0 3.5px var(--ink);
+}
+
+/* ----------------------------------------------------------- palette bar */
+
+.palettebar {
+  position: relative;
+}
+
+.swatch {
+  transition: transform 140ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.swatch:active,
+.swatch.open {
+  transform: scale(1.18);
+}
+
+.swatch.small {
+  width: 34px;
+  height: 34px;
+}
+
+/* The mix swatch reads as "all of them" without being a rainbow toy. */
+.swatch.mix {
+  background:
+    conic-gradient(
+      from 210deg,
+      #a73a34,
+      #e5a23c,
+      #7c8a47,
+      #2c7a73,
+      #3b6288,
+      #6a4b82,
+      #a94578,
+      #a73a34
+    );
+  position: relative;
+}
+
+.swatch.mix::after {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  background: var(--chrome);
+}
+
+.fan,
+.huepicker {
+  position: absolute;
+  bottom: calc(100% - 2px);
+  left: 14px;
+  right: 14px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border-radius: 999px;
+  background: rgba(231, 224, 210, 0.97);
+  border: 1px solid var(--rule);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 20px rgba(27, 26, 23, 0.13);
+  animation: fan-in 170ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.fan {
+  justify-content: space-between;
+}
+
+@keyframes fan-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px) scale(0.97);
+  }
+}
+
+.huerange {
+  flex: 1;
+  min-width: 90px;
+  height: 22px;
+  appearance: none;
+  background: linear-gradient(
+    to right,
+    hsl(0 52% 46%),
+    hsl(60 52% 46%),
+    hsl(120 52% 46%),
+    hsl(180 52% 46%),
+    hsl(240 52% 46%),
+    hsl(300 52% 46%),
+    hsl(359 52% 46%)
+  );
+  border-radius: 999px;
+  border: 1px solid var(--rule);
+}
+
+.huerange::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+}
+
+.huerange::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 2px solid var(--ink);
 }
 
 /* Mobile-first; on a wide screen the chrome stays a column and only the sheet

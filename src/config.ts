@@ -92,6 +92,15 @@ export const DEFAULT_TUNING = {
   posSmoothing: 0.55,
   /** Minimum screen travel (css px) before a new point is recorded. */
   minStepCss: 0.7,
+  /**
+   * How far ahead of the last raw sample the visible tip is drawn, in ms of
+   * travel at the current speed. Display only — never recorded — so a bad
+   * guess lasts one frame and leaves nothing behind. This is the difference
+   * between ink that follows the finger and ink that chases it. 0 disables.
+   */
+  predictMs: 26,
+  /** Ceiling on that extrapolation, in logical px, so a flick can't overshoot. */
+  predictMaxPx: 70,
   /** Entry/exit taper length, as a multiple of the pen's base width. */
   taper: 1.0,
   /** Width multiplier at the very tip of a tapered stroke. */
@@ -121,6 +130,8 @@ export const TUNING: Tuning = {
   widthSmoothing: num('widthSmoothing', DEFAULT_TUNING.widthSmoothing),
   posSmoothing: num('posSmoothing', DEFAULT_TUNING.posSmoothing),
   minStepCss: num('minStepCss', DEFAULT_TUNING.minStepCss),
+  predictMs: num('predictMs', DEFAULT_TUNING.predictMs),
+  predictMaxPx: num('predictMaxPx', DEFAULT_TUNING.predictMaxPx),
   taper: num('taper', DEFAULT_TUNING.taper),
   taperFloor: num('taperFloor', DEFAULT_TUNING.taperFloor),
   pressureFloor: num('pressureFloor', DEFAULT_TUNING.pressureFloor),
