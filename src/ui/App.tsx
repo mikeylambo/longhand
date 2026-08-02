@@ -110,11 +110,24 @@ export function App() {
 
   return (
     <DrawTurn
-      key={`${canvas.canvasId ?? canvas.seed}-${canvas.slot}`}
+      key={`${canvas.turnId ?? canvas.canvasId ?? canvas.seed}-${canvas.slot}`}
       seed={canvas.seed}
       slot={canvas.slot}
       palette={canvas.palette}
       priorLayers={canvas.priorLayers}
+      width={canvas.width}
+      height={canvas.height}
+      expiresAt={canvas.expiresAt}
+      onExpired={async () => {
+        setPhase('loading')
+        try {
+          setCanvas(await session.nextCanvas())
+          setPhase('draw')
+        } catch (e) {
+          setError(message(e))
+          setPhase('error')
+        }
+      }}
       onSubmit={async (layer) => {
         setJustDrawn(layer)
         setPhase('loading')

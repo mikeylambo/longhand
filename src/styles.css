@@ -61,10 +61,11 @@ button {
 }
 
 .topbar .slot {
-  font-size: 11px;
-  letter-spacing: 0.14em;
+  font-size: 10px;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted);
+  white-space: nowrap;
 }
 
 .seed {
@@ -73,6 +74,9 @@ button {
   font-style: italic;
   text-align: center;
   line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .topbar .right {
@@ -104,10 +108,12 @@ button {
   margin: 0 14px 8px;
 }
 
+/* Was 3px, which made a third of the budget draining look like nothing
+   happening. Depletion has to be legible at a glance or the meter is decoration. */
 .ink-track {
-  height: 3px;
+  height: 6px;
   background: var(--chrome-2);
-  border-radius: 2px;
+  border-radius: 3px;
   overflow: hidden;
 }
 
@@ -229,16 +235,28 @@ button {
 
 /* ---------------------------------------------------------------- palette */
 
+/* One row that scrolls, not two that stack — the vertical space belongs to the
+   sheet. Scroll padding keeps the first and last swatch off the bezel. */
 .palette {
-  display: grid;
-  grid-template-columns: repeat(8, 1fr);
-  gap: 8px;
-  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.palette::-webkit-scrollbar {
+  display: none;
 }
 
 .swatch {
   position: relative;
-  aspect-ratio: 1;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   border: 1px solid rgba(27, 26, 23, 0.16);
 }
@@ -257,6 +275,12 @@ button {
     max-width: 620px;
     margin-left: auto;
     margin-right: auto;
+  }
+
+  /* Wide enough for all sixteen swatches, so the row only scrolls on a phone. */
+  .palette {
+    max-width: 800px;
+    justify-content: center;
   }
 }
 
@@ -388,6 +412,116 @@ button {
 .slotchip.on {
   background: var(--ink);
   border-color: var(--ink);
+  color: var(--paper);
+}
+
+/* ------------------------------------------------------------- turn clock */
+
+.clock {
+  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
+
+.clock.urgent {
+  color: #a73a34;
+}
+
+.expired {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+  background: rgba(231, 224, 210, 0.92);
+  backdrop-filter: blur(3px);
+}
+
+.expired strong {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 400;
+}
+
+.expired p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 8px 0 16px;
+  max-width: 34ch;
+}
+
+/* ---------------------------------------------------------------- gallery */
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.card {
+  margin: 0;
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.card img,
+.card-placeholder {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 3px;
+}
+
+.card figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.card figcaption > span:last-child {
+  white-space: nowrap;
+}
+
+.card .seed-small {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linkbtn.tiny {
+  padding: 3px 9px;
+  font-size: 11px;
+}
+
+/* The `button` reset above doesn't reach anchors, so link-styled buttons would
+   otherwise render as default blue links. */
+a.linkbtn {
+  color: var(--ink);
+  text-decoration: none;
+  display: inline-block;
+}
+
+a.linkbtn.solid {
   color: var(--paper);
 }
 

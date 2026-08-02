@@ -3,8 +3,17 @@
 // overridable from the URL (?ink=6000&speedRef=1.2) so a tuning session on a
 // real phone doesn't need a rebuild.
 
+/**
+ * The sheet is square.
+ *
+ * The brief locked 2048×1536, which is print-shaped but wrong for the device
+ * almost everyone will draw on: a 4:3 landscape sheet fitted into a portrait
+ * phone is a band across the middle with dead space above and below, and the
+ * first thing a new player sees is a strip rather than a surface. Square fills
+ * the width, keeps the same rough area, and is still print-viable at 1.0.
+ */
 export const CANVAS_W = 2048
-export const CANVAS_H = 1536
+export const CANVAS_H = 2048
 
 export const SLOTS_PER_CANVAS = 12
 export const TURN_MS = 10 * 60 * 1000
@@ -56,10 +65,13 @@ export const DEFAULT_TUNING = {
    * Total stroke length, in logical px, for one turn. The pen runs out.
    *
    * The brief locked this at 4000. Milestone 1 measured a single arc across
-   * the sheet at 3076 — one and a half gestures per player — so it was raised
-   * to 14000 pending a real playtest. Tune it *down* until it bites.
+   * the sheet at 3076 — one and a half gestures per player — so it went to
+   * 14000, then to 10000 once there were real numbers to tune against: a
+   * stick figure at phone scale costs ~4300, and one dense scribbled stroke
+   * from a live layer cost 10909. 10000 buys a considered contribution and
+   * makes a careless one cost something.
    */
-  inkBudget: 14000,
+  inkBudget: 10000,
   /** Screen speed (css px/ms) at which the pen reaches its thinnest. */
   speedRef: 1.7,
   /** Width multiplier at max speed / at rest. */

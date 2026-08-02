@@ -31,8 +31,9 @@ export function SelfTestPage() {
     <div className="panel">
       <h1 data-testid="verdict">{ok ? 'Replay is exact' : 'Replay drifts'}</h1>
       <p>
-        Twelve fixture layers rendered at full canvas resolution, every
-        comparison pixel-for-pixel. {ms}ms.
+        Twelve fixture layers at full canvas resolution, run at every sheet
+        shape in the archive, every comparison pixel-for-pixel. {checks.length}{' '}
+        checks in {ms}ms.
       </p>
       <div className="scroll">
         <table className="checks">

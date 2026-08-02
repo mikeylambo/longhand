@@ -38,7 +38,15 @@ test('replay is pixel-exact', async ({ page }) => {
         .__selftest,
   )
 
-  expect(result.checks.length).toBeGreaterThan(8)
+  // Both sheet shapes must be covered. A canvas renders against the dimensions
+  // it was opened at forever, so the square default and the 2048×1536 canvases
+  // already in the archive are two live code paths — testing only the current
+  // default would leave the older one unguarded.
+  for (const shape of ['2048×2048', '2048×1536']) {
+    const forShape = result.checks.filter((c) => c.name.startsWith(shape))
+    expect(forShape.length, `no checks ran at ${shape}`).toBeGreaterThan(8)
+  }
+
   for (const c of result.checks) {
     expect(
       c.differing,
