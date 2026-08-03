@@ -361,6 +361,78 @@ claim discarded.
 `height` do — a closed canvas has to stay judged by the rules it was played
 under, and the server must not depend on a constant in a JS bundle.
 
+## Rules for operating on the ledger
+
+Two, and they are not stylistic.
+
+**Never disable `layers_append_only_trg`.** Append-only is the product's one
+irreversible promise, and a trigger stood down "just for a moment" is a promise
+that held until it was inconvenient. If test rows need clearing from a
+*throwaway* project, `TRUNCATE` does it without touching the trigger, because
+TRUNCATE fires statement triggers and this one is per-row. On a live archive
+nothing is cleared at all: hide the layer.
+
+I broke this rule once, standing the trigger down to delete a canvas an API test
+had opened on the live project. It was re-armed immediately and verified, but it
+should not have happened — the test should not have been able to write there.
+That is what the guards below now prevent.
+
+**Tests cannot reach the live archive.** The database-backed specs read
+`TEST_SUPABASE_URL` / `TEST_SUPABASE_PUBLISHABLE_KEY` from `.env.test.local`,
+and `tests/support/ledger.ts` refuses to run if they are missing, if they name a
+protected project ref, or if they match the app's own `VITE_SUPABASE_URL`.
+Missing credentials fail the run rather than skipping it — a skipped safety test
+reads as green.
+
+Point them at a **local** stack, not a second cloud project:
+
+```bash
+supabase start   # prints a URL and anon key for .env.test.local
+```
+
+Free, ephemeral, and it cannot be production by construction. Docker comes from
+Colima here (`brew install colima docker supabase/tap/supabase`, then
+`colima start`), which needs no admin password.
+
+Building the schema from scratch this way immediately paid for itself — see
+below.
+
+## What building from scratch found
+
+The repo did not reproduce the database, in two ways, and neither was visible
+from the hosted project because the hosted project already had the state.
+
+**Three migrations existed only in the cloud.** `tints_shades_and_gamut`,
+`colour_gamut` and `submit_turn_uses_colour_allowed` had been applied through
+the management API without ever being written to `supabase/migrations`. A fresh
+deploy would have come up with sixteen colours instead of eighty, no gamut
+function, and a `submit_turn` that never checked a colour. They are now files
+0011–0013.
+
+**No grant was ever written down.** Every table was readable only because the
+hosted platform implicitly grants `SELECT` on new tables in `public` to `anon`.
+Built locally from the same migrations, `anon` could not read a single row and
+the app came up dead. 0015 states the read paths explicitly.
+
+The same audit showed `anon` held `INSERT`, `UPDATE` and `DELETE` on
+`canvases`, `layers`, `turns` and `signatures` in production. Nothing could use
+them — RLS defines no write policy, and that was verified by attacking the
+endpoint — but they were one accidental policy away from mattering. 0015 and
+0016 revoke them, and default privileges no longer hand them to future tables.
+Writes go through the security-definer functions, which is the only path that
+was ever intended.
+
+```bash
+npm run test:app      # everything that needs only a browser
+npm run test:ledger   # needs the throwaway project
+npm test              # both
+```
+
+`tests/colour.spec.ts` touches no database at all — it is pure client maths
+checked against a copy of the migration. The check that the client has not
+drifted from the *actual* `palette_colors` table lives in `tests/ledger.spec.ts`,
+where a database dependency belongs.
+
 ## Known gaps
 
 **The device key is a bearer token in local storage.** Clearing it loses your

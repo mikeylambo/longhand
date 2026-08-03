@@ -22,6 +22,9 @@ export interface CanvasRow {
    *  changing the default would reflow everything already in the archive. */
   width: number
   height: number
+  /** Whether it appears in the gallery. Unlisted canvases stay reachable at
+   *  their own URL — this is curation, not moderation. */
+  listed: boolean
   created_at: string
   closed_at: string | null
 }
@@ -214,13 +217,20 @@ export async function submitTurn(
   return data as { layer: LayerRow; canvas: CanvasRow }
 }
 
-/** Closed canvases, newest first — the gallery. */
+/**
+ * Closed, listed canvases, newest first — the gallery.
+ *
+ * Unlisted ones are filtered here rather than removed anywhere: they keep their
+ * URL, their timelapse and their cards, and everyone who drew on one still sees
+ * exactly what they saw before. Nothing leaves the ledger.
+ */
 export async function fetchClosedCanvases(limit = 40): Promise<CanvasRow[]> {
   const db = requireSupabase()
   const { data, error } = await db
     .from('canvases')
     .select('*')
     .eq('status', 'closed')
+    .eq('listed', true)
     .order('closed_at', { ascending: false })
     .limit(limit)
   if (error) throw new Error(`could not load the gallery: ${error.message}`)
