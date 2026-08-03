@@ -387,14 +387,40 @@ reads as green.
 Point them at a **local** stack, not a second cloud project:
 
 ```bash
-supabase start   # needs Docker; prints a URL and anon key for .env.test.local
+supabase start   # prints a URL and anon key for .env.test.local
 ```
 
-Free, ephemeral, and it cannot be production by construction. A second cloud
-project also satisfies the guards, but it costs a project slot and leaves two
-databases whose migrations have to be kept in step. Neither is set up here —
-Docker isn't installed on this machine and the Supabase org is at its
-two-active-project limit — so `test:ledger` fails by design until one exists.
+Free, ephemeral, and it cannot be production by construction. Docker comes from
+Colima here (`brew install colima docker supabase/tap/supabase`, then
+`colima start`), which needs no admin password.
+
+Building the schema from scratch this way immediately paid for itself — see
+below.
+
+## What building from scratch found
+
+The repo did not reproduce the database, in two ways, and neither was visible
+from the hosted project because the hosted project already had the state.
+
+**Three migrations existed only in the cloud.** `tints_shades_and_gamut`,
+`colour_gamut` and `submit_turn_uses_colour_allowed` had been applied through
+the management API without ever being written to `supabase/migrations`. A fresh
+deploy would have come up with sixteen colours instead of eighty, no gamut
+function, and a `submit_turn` that never checked a colour. They are now files
+0011–0013.
+
+**No grant was ever written down.** Every table was readable only because the
+hosted platform implicitly grants `SELECT` on new tables in `public` to `anon`.
+Built locally from the same migrations, `anon` could not read a single row and
+the app came up dead. 0015 states the read paths explicitly.
+
+The same audit showed `anon` held `INSERT`, `UPDATE` and `DELETE` on
+`canvases`, `layers`, `turns` and `signatures` in production. Nothing could use
+them — RLS defines no write policy, and that was verified by attacking the
+endpoint — but they were one accidental policy away from mattering. 0015 and
+0016 revoke them, and default privileges no longer hand them to future tables.
+Writes go through the security-definer functions, which is the only path that
+was ever intended.
 
 ```bash
 npm run test:app      # everything that needs only a browser
