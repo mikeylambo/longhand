@@ -1,0 +1,137 @@
+name: Backup the archive
+
+# The hosting tier has no automated backups, and the archive is append-only —
+# the one thing here that cannot be regenerated from the repo. So it gets dumped
+# nightly, checked, and kept for thirty days.
+#
+# The dump lands in GitHub Actions artifacts: private to this repository, on a
+# different provider from the database, pruned automatically by retention. That
+# is a real backup against losing the Supabase project, which is the risk being
+# managed. It is *not* a backup against losing the GitHub account — both live
+# there. Worth an off-GitHub copy before this archive is worth anything to
+# anyone; see README, "Backups".
+
+on:
+  schedule:
+    # 03:20 UTC. Off the hour because everyone schedules on the hour and
+    # GitHub's shared runners queue accordingly.
+    - cron: '20 3 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write # only used to shout when a backup fails
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL 17 client
+        # The runner ships an older client, and pg_dump refuses to dump a server
+        # newer than itself.
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo tee /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc >/dev/null
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-client-17
+          pg_dump --version
+
+      - name: Dump and verify
+        id: backup
+        env:
+          # Never in the repo. Settings → Secrets and variables → Actions.
+          DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: ./scripts/backup.sh backups
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: longhand-archive-${{ github.run_id }}
+          path: backups/*.sql.gz
+          # Thirty daily snapshots, older ones pruned. Retention does the
+          # pruning, so there is no cleanup job to rot.
+          retention-days: 30
+          if-no-files-found: error
+          compression-level: 0 # already gzipped
+
+      - name: Say what was kept
+        run: |
+          echo "### Archive backed up" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| | |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| canvases | ${{ steps.backup.outputs.canvases }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| layers | ${{ steps.backup.outputs.layers }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| compressed | ${{ steps.backup.outputs.size }} bytes |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| kept until | 30 days from now |" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Shout
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            // A failed scheduled job is an email that is easy to miss, and a
+            // backup that has been quietly failing for three weeks is the whole
+            // problem. An open issue is harder to scroll past, and one issue is
+            // reused so a long outage does not become forty of them.
+            const title = 'Nightly archive backup is failing'
+            const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}` +
+                        `/actions/runs/${context.runId}`
+            const body = [
+              `The nightly backup failed on ${new Date().toISOString().slice(0, 10)}.`,
+              '',
+              `Run: ${url}`,
+              '',
+              'The archive is append-only and the database has no other backups,',
+              'so every night this stays broken is a night of unprotected history.',
+              '',
+              'Most likely causes, in order:',
+              '- `SUPABASE_DB_URL` rotated or expired',
+              '- the row counts inside the dump disagreed with the live database',
+              '  (a truncated dump — the failure that looks like a working backup)',
+              '- the project is paused',
+            ].join('\n')
+
+            const { data: open } = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: 'backup',
+            })
+            const existing = open.find(i => i.title === title)
+            if (existing) {
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: existing.number,
+                body: `Failed again — ${url}`,
+              })
+            } else {
+              await github.rest.issues.create({
+                ...context.repo, title, body, labels: ['backup'],
+              })
+            }
+
+      - name: Close the alarm
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = 'Nightly archive backup is failing'
+            const { data: open } = await github.rest.issues.listForRepo({
+              ...context.repo, state: 'open', labels: 'backup',
+            })
+            for (const issue of open.filter(i => i.title === title)) {
+              await github.rest.issues.createComment({
+                ...context.repo, issue_number: issue.number,
+                body: 'Backup succeeded again; closing.',
+              })
+              await github.rest.issues.update({
+                ...context.repo, issue_number: issue.number, state: 'closed',
+              })
+            }

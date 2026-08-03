@@ -361,6 +361,101 @@ claim discarded.
 `height` do — a closed canvas has to stay judged by the rules it was played
 under, and the server must not depend on a constant in a JS bundle.
 
+## Backups
+
+The hosting tier includes none, and the archive is the one thing here that
+cannot be regenerated from this repo. So `.github/workflows/backup.yml` dumps it
+nightly at 03:20 UTC, checks it, and keeps thirty days of snapshots as private
+GitHub Actions artifacts.
+
+**Setup, once.** The workflow needs a connection string in
+*Settings → Secrets and variables → Actions* as `SUPABASE_DB_URL`. It is never
+in the repo and never printed by any step.
+
+Take the **Session pooler** string from the Supabase dashboard
+(*Project Settings → Database → Connection string → Session*), not the direct
+one. Direct connections to `db.<ref>.supabase.co` resolve to IPv6 only, and
+GitHub's runners are IPv4 — the first scheduled run would fail for a reason that
+looks nothing like the actual cause. The session pooler speaks the full protocol,
+so `pg_dump` works against it; the transaction pooler does not.
+
+**What "verified" means here.** Checking the file size catches a zero-byte dump
+and nothing else — a dump that stopped halfway through the layers table is a
+perfectly plausible forty kilobytes. So the backup reads the live row counts
+first, then counts the rows *inside* the finished dump, and fails if any table
+disagrees. It also refuses to write a backup when the database reports zero
+layers, and refuses one less than half the size of the previous night's, since
+an append-only archive should never shrink. A failed run deletes its own output
+rather than leaving a broken file that looks like a good one, and opens a GitHub
+issue — one issue, reused, so a fortnight of failures doesn't become fourteen
+notifications you stop reading.
+
+Proven by breaking it deliberately:
+
+| what was done to the dump | caught by |
+|---|---|
+| stopped at 60% of the file | 3 tables short |
+| complete, but 3 layer rows removed | layers 9, expected 12 |
+| database emptied first | refuses at 0 layers |
+| restore aimed at the live project | refuses on the ref |
+
+### Restoring
+
+Two files come out each night. `-data.sql.gz` is what a restore loads;
+`-schema.sql.gz` is carried so the artifact explains itself years later without
+the repo at that commit.
+
+The data dump is `--data-only` deliberately. A combined schema+data dump carries
+`ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin`, which the role performing the
+restore is not permitted to execute — so the obvious single-file dump is exactly
+the one that fails at the moment you need it. Schema comes from
+`supabase/migrations` instead, which is verified to build from nothing.
+
+```bash
+# 1. get the schema in place — extensions, grants, triggers, the cron sweep
+supabase db reset                    # local
+# or apply supabase/migrations/*.sql in order against a fresh project
+
+# 2. load the archive, asserting what you expect to find
+EXPECT_CANVASES=1 EXPECT_LAYERS=12 \
+  npm run restore -- backups/longhand-2026-08-03-data.sql.gz
+```
+
+`restore.sh` truncates the target before loading, so it is repeatable, and it
+**refuses to run against the live project** — that refusal is the only thing
+between a mistyped URL and the destruction of the history the backup exists to
+protect.
+
+It verifies more than row counts, because rows arriving proves nothing about
+whether the drawings survived: it sums the strokes and points inside the
+restored `layers`, and checks the append-only trigger came back armed.
+
+### Practised, not assumed
+
+Run end to end on 2026-08-03 against a local stack holding the same content as
+production:
+
+```
+seed → backup → supabase db reset (canvases=0 layers=0) → restore
+  canvases 1 · layers 12 · signatures 12 · turns 12 · seeds 12 · palette 80
+  strokes 95 · points 2891 · append-only armed
+```
+
+Matching production's counts exactly.
+
+The one step not yet exercised is dumping production itself, which needs
+`SUPABASE_DB_URL`. Trigger the workflow manually once the secret exists and
+check the run summary before trusting the schedule.
+
+### What this does not protect against
+
+The dumps live in GitHub Actions artifacts — a different provider from the
+database, which is the risk being managed, and private to this repository. They
+do **not** survive losing the GitHub account, since the repo and the backups sit
+in the same place. Before this archive matters to anyone but us, one of these
+nightly artifacts should be copied somewhere else entirely. The workflow is a
+single upload step; adding a second destination is a small change.
+
 ## Rules for operating on the ledger
 
 Two, and they are not stylistic.
