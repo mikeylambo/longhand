@@ -32,6 +32,25 @@ PSQL="${PSQL:-psql}"
 # Same list the test suite guards, for the same reason.
 PROTECTED_REFS=(uxlhgbvhmukfrhtzzifu rzpjciflydbkpxcimdhb)
 
+ERR="$(mktemp)"
+trap 'rm -f "$ERR"' EXIT
+
+# Never let a connection string reach a log.
+redact() { sed -E 's#(://[^:/@]+):[^@]*@#\1:***@#g'; }
+
+# Say what failed, then let postgres say why. This is the script somebody runs
+# at the worst possible moment; it is not the place to paraphrase the database.
+fail() {
+  echo "" >&2
+  echo "RESTORE FAILED: $1" >&2
+  if [[ -n "${2:-}" && -s "${2:-/dev/null}" ]]; then
+    echo "" >&2
+    echo "  what postgres actually said:" >&2
+    redact < "$2" | sed 's/^/    /' >&2
+  fi
+  exit 1
+}
+
 if [[ -z "$DUMP" ]]; then
   echo "usage: scripts/restore.sh <dump.sql.gz> [target-database-url]" >&2
   exit 1
@@ -54,19 +73,22 @@ EOF
   fi
 done
 
+# Reachability first, so "cannot connect" never arrives disguised as "no schema".
+"$PSQL" "$TARGET" -tAXc 'select 1' >/dev/null 2>"$ERR" \
+  || fail "could not connect to the target database." "$ERR"
+
 # The schema has to be there already, because the dump only carries rows.
-if ! "$PSQL" "$TARGET" -tAc "select to_regclass('public.layers')" | grep -q layers; then
-  cat >&2 <<'EOF'
-FAIL: the target has no `layers` table.
+HAS_LAYERS="$("$PSQL" "$TARGET" -tAXc "select to_regclass('public.layers')" 2>"$ERR")" \
+  || fail "could not inspect the target schema." "$ERR"
+if [[ "$HAS_LAYERS" != *layers* ]]; then
+  fail "the target has no \`layers\` table.
 
-This dump is data-only. Build the schema first:
+       This dump is data-only. Build the schema first:
 
-  supabase db reset                      # local
-  # or apply supabase/migrations/*.sql in order against a new project
+         supabase db reset                    # local
+         # or apply supabase/migrations/*.sql in order against a new project
 
-then run this again.
-EOF
-  exit 1
+       then run this again."
 fi
 
 echo "Restoring $(basename "$DUMP")"
@@ -80,14 +102,19 @@ echo ""
 # for, and why the default target is a local stack.
 "$PSQL" "$TARGET" --quiet -v ON_ERROR_STOP=1 -c \
   "truncate public.layers, public.turns, public.canvases, public.signatures,
-            public.seeds, public.palette_colors cascade;" >/dev/null
+            public.seeds, public.palette_colors cascade;" >/dev/null 2>"$ERR" \
+  || fail "could not clear the target before loading." "$ERR"
 
 # gunzip -c so the archive on disk is never consumed; a restore must be
 # repeatable, including after it goes wrong.
 if [[ "$DUMP" == *.gz ]]; then
-  gunzip -c "$DUMP" | "$PSQL" "$TARGET" --quiet -v ON_ERROR_STOP=1 >/dev/null
+  gunzip -c "$DUMP" | "$PSQL" "$TARGET" --quiet -v ON_ERROR_STOP=1 >/dev/null 2>"$ERR" \
+    || fail "loading the dump failed partway through. The target now holds a
+       partial restore — clear it and start again rather than trusting it." "$ERR"
 else
-  "$PSQL" "$TARGET" --quiet -v ON_ERROR_STOP=1 -f "$DUMP" >/dev/null
+  "$PSQL" "$TARGET" --quiet -v ON_ERROR_STOP=1 -f "$DUMP" >/dev/null 2>"$ERR" \
+    || fail "loading the dump failed partway through. The target now holds a
+       partial restore — clear it and start again rather than trusting it." "$ERR"
 fi
 
 echo "Restored. Counting what arrived:"

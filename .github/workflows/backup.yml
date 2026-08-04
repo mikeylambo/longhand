@@ -26,6 +26,13 @@ permissions:
   contents: read
   issues: write # only used to shout when a backup fails
 
+env:
+  # Pinned deliberately. The runner ships its own client and apt will happily
+  # hand over a newer one; neither is a decision anybody made. When Supabase
+  # moves to 18 this number is what makes the job stop on the preflight check
+  # instead of quietly producing dumps that cannot be restored.
+  PG_MAJOR: '17'
+
 jobs:
   dump:
     runs-on: ubuntu-latest
@@ -33,24 +40,55 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install PostgreSQL 17 client
-        # The runner ships an older client, and pg_dump refuses to dump a server
-        # newer than itself.
+      - name: Install the pinned PostgreSQL client
+        # The runner already has a client — 16 at the time of writing — and the
+        # server is 17, which pg_dump refuses to dump. Installing 17 is only
+        # half the fix: both versions then live under /usr/lib/postgresql/, and
+        # which one `pg_dump` resolves to depends on PATH order, which is not
+        # something to bet a nightly job on. So the absolute paths are exported
+        # and the script uses those.
         run: |
+          set -euo pipefail
           sudo install -d /usr/share/postgresql-common/pgdg
           curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
             | sudo tee /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc >/dev/null
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
             | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends postgresql-client-17
-          pg_dump --version
+          sudo apt-get install -y --no-install-recommends "postgresql-client-${PG_MAJOR}"
+
+          BIN="/usr/lib/postgresql/${PG_MAJOR}/bin"
+          for exe in pg_dump psql; do
+            if [[ ! -x "$BIN/$exe" ]]; then
+              echo "::error::$BIN/$exe is missing after installing postgresql-client-${PG_MAJOR}." >&2
+              echo "Available versions:" >&2
+              ls -1 /usr/lib/postgresql/ >&2 || true
+              exit 1
+            fi
+          done
+
+          # Assert the binary is the version we asked for, rather than trusting
+          # the package name and the path to agree.
+          FOUND="$("$BIN/pg_dump" --version | awk '{print $3}' | cut -d. -f1)"
+          if [[ "$FOUND" != "$PG_MAJOR" ]]; then
+            echo "::error::$BIN/pg_dump reports major $FOUND, expected $PG_MAJOR" >&2
+            exit 1
+          fi
+
+          echo "PG_DUMP=$BIN/pg_dump" >> "$GITHUB_ENV"
+          echo "PSQL=$BIN/psql"       >> "$GITHUB_ENV"
+
+          echo "pinned  $("$BIN/pg_dump" --version)"
+          echo "on PATH $(pg_dump --version 2>/dev/null || echo none) <- not used"
 
       - name: Dump and verify
         id: backup
         env:
           # Never in the repo. Settings → Secrets and variables → Actions.
           DATABASE_URL: ${{ secrets.SUPABASE_DB_URL }}
+          # Absolute paths from the step above; PATH order is not a promise.
+          PG_DUMP: ${{ env.PG_DUMP }}
+          PSQL: ${{ env.PSQL }}
         run: ./scripts/backup.sh backups
 
       - name: Upload
@@ -95,8 +133,15 @@ jobs:
               'The archive is append-only and the database has no other backups,',
               'so every night this stays broken is a night of unprotected history.',
               '',
+              'The log prints what postgres actually said, under',
+              '"what postgres actually said" — read that first, it is usually',
+              'the whole answer. Passwords are stripped from it.',
+              '',
               'Most likely causes, in order:',
-              '- `SUPABASE_DB_URL` rotated or expired',
+              '- `SUPABASE_DB_URL` rotated, expired, or is the direct string',
+              '  rather than the session pooler one',
+              '- the database was upgraded past the pinned PG_MAJOR, which the',
+              '  preflight check stops before anything is written',
               '- the row counts inside the dump disagreed with the live database',
               '  (a truncated dump — the failure that looks like a working backup)',
               '- the project is paused',
