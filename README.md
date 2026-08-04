@@ -379,6 +379,26 @@ GitHub's runners are IPv4 — the first scheduled run would fail for a reason th
 looks nothing like the actual cause. The session pooler speaks the full protocol,
 so `pg_dump` works against it; the transaction pooler does not.
 
+**Version pinning.** `PG_MAJOR` is set in one place in the workflow and the
+matching client is installed from the PGDG repository. The runner also ships its
+own client — 16 while the server is 17 — and both end up under
+`/usr/lib/postgresql/`, so the workflow exports absolute paths to the pinned
+binaries rather than trusting PATH order. The script checks the client's major
+version against `server_version_num` **before** it reads anything, so a mismatch
+is the first line of the log rather than something that surfaces halfway
+through looking like a database problem.
+
+The pin is also the alarm for the upgrade nobody schedules: when Supabase moves
+to 18, the preflight stops the job with an explicit "the pin has to move"
+message instead of quietly producing dumps that cannot be restored.
+
+**Errors are reported, not paraphrased.** Every failure prints what postgres
+actually said underneath the friendly summary, with any password stripped out.
+An earlier version swallowed `psql`'s stderr and replaced it with a guess; the
+guess was wrong, and a pooler username problem cost two rounds of debugging that
+the database had already described precisely. This is meant to run unattended
+for years — it has to be able to explain itself.
+
 **What "verified" means here.** Checking the file size catches a zero-byte dump
 and nothing else — a dump that stopped halfway through the layers table is a
 perfectly plausible forty kilobytes. So the backup reads the live row counts
@@ -398,6 +418,9 @@ Proven by breaking it deliberately:
 | complete, but 3 layer rows removed | layers 9, expected 12 |
 | database emptied first | refuses at 0 layers |
 | restore aimed at the live project | refuses on the ref |
+| client 16 against a 17 server | preflight, before anything is read |
+| server upgraded past the pin | preflight, with the pin to change |
+| wrong username / unreachable host | the actual `psql` error, password stripped |
 
 ### Restoring
 
