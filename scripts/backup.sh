@@ -62,7 +62,23 @@ SCHEMA_GZ="$SCHEMA.gz"
 
 ERR="$(mktemp)"
 COUNTS="$(mktemp)"
+REPORTED=0
 trap 'rm -f "$ERR" "$COUNTS"' EXIT
+
+# A backstop, because `set -e` kills the script at the failing command and says
+# nothing. That is how this exited 1 in CI with a blank log after printing six
+# perfectly good row counts. Any path that dies without reporting itself is a
+# bug in this script, and now it says so and where.
+trap 'rc=$?
+  if [[ "$REPORTED" -eq 0 ]]; then
+    echo "" >&2
+    echo "BACKUP FAILED: unexpected error on line $LINENO (exit $rc)." >&2
+    echo "  Nothing above explained it, which means this script has a path that" >&2
+    echo "  fails without reporting. That is a bug — please fix it there rather" >&2
+    echo "  than reading the line number every time." >&2
+    rm -f "$DUMP" "$GZ" "$SCHEMA" "$SCHEMA_GZ"
+  fi
+  exit "$rc"' ERR
 
 # A connection string must never reach a CI log, and postgres does sometimes
 # echo one back at you.
@@ -73,6 +89,7 @@ redact() { sed -E 's#(://[^:/@]+):[^@]*@#\1:***@#g'; }
 # database had already named — this ran unattended for years is the whole
 # premise, and it cannot explain itself if it throws the evidence away.
 fail() {
+  REPORTED=1
   echo "" >&2
   echo "BACKUP FAILED: $1" >&2
   if [[ -n "${2:-}" && -s "${2:-/dev/null}" ]]; then
@@ -102,7 +119,7 @@ psql_value() { # <sql> <what we were doing>
 CLIENT_RAW="$("$PG_DUMP" --version 2>"$ERR")" \
   || fail "could not run pg_dump at '$PG_DUMP'. Is the client installed, and is
        the path right? CI sets PG_DUMP explicitly for this reason." "$ERR"
-CLIENT_MAJOR="$(printf '%s' "$CLIENT_RAW" | awk '{print $3}' | cut -d. -f1)"
+CLIENT_MAJOR="$(printf '%s' "$CLIENT_RAW" | awk '{print $3}' | cut -d. -f1 || true)"
 
 [[ "$CLIENT_MAJOR" =~ ^[0-9]+$ ]] \
   || fail "could not read a version out of: $CLIENT_RAW"
@@ -136,12 +153,18 @@ mkdir -p "$OUT_DIR"
 
 # ---------------------------------------------------------------- live counts
 
-live_count() { grep -E "^$1\t" "$COUNTS" | cut -f2; }
+live_count() { # <table> — dies loudly rather than returning empty
+  local n
+  n="$(awk -v t="$1" '$1 == t { print $2; found = 1 } END { exit !found }' "$COUNTS")" \
+    || fail "internal: no row count was recorded for '$1'."
+  printf '%s' "$n"
+}
 
 echo "Reading live row counts…"
 for t in "${TABLES[@]}"; do
   n="$(psql_value "select count(*) from public.$t" "could not read public.$t")"
-  printf '%s\t%s\n' "$t" "$n" >> "$COUNTS"
+  [[ "$n" =~ ^[0-9]+$ ]] || fail "public.$t returned '$n', which is not a row count."
+  printf '%s %s\n' "$t" "$n" >> "$COUNTS"
   printf '  %-16s %s\n' "$t" "$n"
 done
 
