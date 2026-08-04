@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "test": "playwright test",
     "test:app": "playwright test --project=app",
-    "test:ledger": "playwright test --project=ledger"
+    "test:ledger": "playwright test --project=ledger",
+    "backup": "scripts/backup.sh",
+    "restore": "scripts/restore.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.111.0",

@@ -24,8 +24,10 @@ const env = Object.fromEntries(
     .filter((l) => l.includes('='))
     .map((l) => [l.slice(0, l.indexOf('=')).trim(), l.slice(l.indexOf('=') + 1).trim()]),
 )
-const URL_BASE = env.VITE_SUPABASE_URL
-const KEY = env.VITE_SUPABASE_PUBLISHABLE_KEY
+// Environment wins over .env.local, so the same script can seed a local stack
+// for a restore drill without being pointed at production by default.
+const URL_BASE = process.env.SEED_SUPABASE_URL || env.VITE_SUPABASE_URL
+const KEY = process.env.SEED_SUPABASE_PUBLISHABLE_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY
 if (!URL_BASE || !KEY) throw new Error('missing Supabase credentials in .env.local')
 
 const W = 2048
