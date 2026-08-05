@@ -104,3 +104,21 @@ export function family(hex: string): string[] {
 export function contrastInk(hex: string): string {
   return hexToHsl(hex).l > 62 ? '#1B1A17' : '#FBF8F1'
 }
+
+/**
+ * Whether a colour is light enough to wash with.
+ *
+ * A multiply never removes a pixel, which is what makes a wash additive, and a
+ * dark enough one repeated over somebody's work leaves a rectangle where their
+ * drawing was — which is removal by another name. So a wash is held to the
+ * lighter half of the range.
+ *
+ * `wash_colour_allowed()` in migration 0027 carries the same number. The UI
+ * must never offer a colour the ledger will refuse after the drawing is
+ * finished, which is the same reason `inGamut` exists.
+ */
+export const WASH_MIN_L = 46
+
+export function washAllowed(hex: string): boolean {
+  return hexToHsl(hex).l >= WASH_MIN_L
+}

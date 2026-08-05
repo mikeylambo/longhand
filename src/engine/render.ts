@@ -22,13 +22,57 @@ export function applyView(
 }
 
 /**
- * Segment `i` runs from the midpoint of (p[i-1], p[i]) through p[i] to the
- * midpoint of (p[i], p[i+1]) as a quadratic, at p[i]'s width. Midpoint
- * quadratics give a C1-continuous curve while letting every sample carry its
- * own width; round caps and joins hide the width discontinuity at the seams.
+ * How much of what is beneath a wash still shows through.
  *
- * A segment is final — it will never need redrawing — once p[i+1] exists.
- * That is what makes the live layer append-only, and therefore cheap.
+ * Low on purpose. A multiply at full strength is a way of painting somebody
+ * out while technically only ever adding, and the promise that nothing you add
+ * can remove anyone else's work has to hold against a tool as well as against
+ * a code path. At this strength a wash tints a region and the drawing under it
+ * stays legible however many times it is washed.
+ */
+export const WASH_ALPHA = 0.28
+
+/**
+ * A fill is a closed polygon, traced from the sheet at the moment it was
+ * placed. Drawing it is therefore ordinary — the interesting part happened
+ * once, on somebody's phone, and what survives into the archive is geometry
+ * rather than an instruction to re-derive geometry.
+ *
+ * `evenodd` so that a region traced with holes in it keeps its holes: fill the
+ * space inside a face and the eyes stay eyes.
+ */
+function drawFill(ctx: CanvasRenderingContext2D, s: Stroke): void {
+  if (s.pts.length < 3) return
+  ctx.save()
+  ctx.globalAlpha = WASH_ALPHA * 2.4
+  ctx.globalCompositeOperation = 'multiply'
+  ctx.fillStyle = s.color
+  ctx.beginPath()
+  ctx.moveTo(s.pts[0].x, s.pts[0].y)
+  for (let i = 1; i < s.pts.length; i++) {
+    // A zero-width sample is the break between one contour and the next: the
+    // outside of the shape, then each hole.
+    if (s.pts[i].w === 0) {
+      ctx.closePath()
+      const next = s.pts[i + 1]
+      if (!next) break
+      ctx.moveTo(next.x, next.y)
+      i++
+      continue
+    }
+    ctx.lineTo(s.pts[i].x, s.pts[i].y)
+  }
+  ctx.closePath()
+  ctx.fill('evenodd')
+  ctx.restore()
+}
+
+/**
+ * Draws samples [from, to) of a stroke, whichever tool made it.
+ *
+ * The three modes diverge here and nowhere else, which is what keeps the
+ * timelapse, the video, the export and the live surface unable to disagree
+ * about what a layer looks like.
  */
 export function drawSegments(
   ctx: CanvasRenderingContext2D,
@@ -39,6 +83,44 @@ export function drawSegments(
   const p = s.pts
   const n = p.length
   if (n === 0) return
+
+  if (s.mode === 'f') {
+    // A polygon is one thing or nothing; there is no partial fill, so it lands
+    // whole the first time the walk reaches it. That keeps the timelapse
+    // honest — a fill appears the moment it was made.
+    if (from <= 0) drawFill(ctx, s)
+    return
+  }
+
+  if (s.mode === 'w') {
+    ctx.save()
+    ctx.globalAlpha = WASH_ALPHA
+    ctx.globalCompositeOperation = 'multiply'
+    drawPath(ctx, s, from, to)
+    ctx.restore()
+    return
+  }
+
+  drawPath(ctx, s, from, to)
+}
+
+/**
+ * Segment `i` runs from the midpoint of (p[i-1], p[i]) through p[i] to the
+ * midpoint of (p[i], p[i+1]) as a quadratic, at p[i]'s width. Midpoint
+ * quadratics give a C1-continuous curve while letting every sample carry its
+ * own width; round caps and joins hide the width discontinuity at the seams.
+ *
+ * A segment is final — it will never need redrawing — once p[i+1] exists.
+ * That is what makes the live layer append-only, and therefore cheap.
+ */
+function drawPath(
+  ctx: CanvasRenderingContext2D,
+  s: Stroke,
+  from: number,
+  to: number,
+): void {
+  const p = s.pts
+  const n = p.length
 
   ctx.strokeStyle = s.color
   ctx.lineCap = 'round'

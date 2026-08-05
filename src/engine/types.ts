@@ -14,6 +14,33 @@ export interface Pt {
   t: number
 }
 
+/**
+ * How a stroke is laid down.
+ *
+ * Absent means the pen, which is everything drawn before these existed and
+ * everything drawn with a pen since. The other two are the tools that could
+ * not be expressed as an ordinary line:
+ *
+ *   w  wash — multiplied over what is beneath at a fixed low alpha, so it
+ *      tints a region without covering it. Restricted to light colours, and
+ *      that restriction is enforced server-side: multiply with a dark enough
+ *      colour, repeated, would amount to painting over somebody, and "nothing
+ *      you add can remove anyone else's" has to survive contact with a tool
+ *      that is technically additive.
+ *   f  fill — the points are a closed polygon rather than a path. Traced on
+ *      the client at the moment of the tap, from what was already on the
+ *      sheet, and then stored as geometry. Storing the seed point instead and
+ *      re-flooding at render time would have been smaller and is the reason
+ *      this took a day: two browsers rasterise a curve differently by a pixel,
+ *      the flood escapes through the gap on one of them, and the archive stops
+ *      being the same picture everywhere. A polygon is a fact.
+ *
+ * Stamps and texture pens need nothing here. They emit ordinary strokes,
+ * which is the whole reason they were cheap to build and cost the archive
+ * nothing.
+ */
+export type StrokeMode = 'w' | 'f'
+
 export interface Stroke {
   /** Hex from the master palette. */
   color: string
@@ -24,6 +51,8 @@ export interface Stroke {
   /** Logical px of travel this stroke consumed from the ink budget. */
   ink: number
   pts: Pt[]
+  /** Absent for a pen stroke, which is most of the archive. */
+  mode?: StrokeMode
 }
 
 /** One player's contribution. Append-only; never edited, never deleted. */

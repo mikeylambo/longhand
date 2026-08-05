@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Surface } from '../engine/surface'
+import { Surface, type Tool } from '../engine/surface'
+import { STAMPS } from '../engine/tools'
 import type { Stroke } from '../engine/types'
 import {
   PEN_WIDTHS,
@@ -7,11 +8,30 @@ import {
   TUNING,
   type Tuning,
 } from '../config'
-import { FitIcon, UndoIcon } from './icons'
+import { FitIcon, ToolsIcon, UndoIcon } from './icons'
 import { Tuner } from './Tuner'
 import { TurnClock } from './TurnClock'
 import { PaletteBar } from './PaletteBar'
+import { washAllowed } from '../colour'
 import { ReportButton } from './ReportButton'
+
+/**
+ * What the tray offers, in the order it offers it.
+ *
+ * The pen first because it is the product; the wash and the fill last because
+ * they act on what other people left and only make sense once there is
+ * something there. Stamps second because they are the reason somebody who says
+ * they cannot draw puts anything down at all.
+ */
+const TOOLS: { id: Tool; label: string }[] = [
+  { id: 'pen', label: 'Pen' },
+  { id: 'stamp', label: 'Stamps' },
+  { id: 'hatch', label: 'Hatch' },
+  { id: 'stipple', label: 'Stipple' },
+  { id: 'halftone', label: 'Halftone' },
+  { id: 'wash', label: 'Wash' },
+  { id: 'fill', label: 'Fill' },
+]
 
 interface Props {
   seed: string
@@ -65,6 +85,10 @@ export function DrawTurn({
   const [tuning, setTuning] = useState<Tuning>(TUNING)
   const [showHint, setShowHint] = useState(true)
   const [expired, setExpired] = useState(false)
+  const [tool, setTool] = useState<Tool>('pen')
+  const [stampIdx, setStampIdx] = useState(0)
+  const [toolsOpen, setToolsOpen] = useState(false)
+  const [refusal, setRefusal] = useState<string | null>(null)
 
   // When the clock runs out the pen stops working, but the sheet stays on
   // screen — vanishing the drawing the instant it is lost would be crueller
@@ -96,6 +120,15 @@ export function DrawTurn({
       },
     })
     s.setPriorLayers(priorLayers)
+    // A fill that refuses has to say so. Doing nothing visible leaves somebody
+    // tapping a region that will never take, deciding the app is broken.
+    s.onFillRefused((why) =>
+      setRefusal(
+        why === 'escaped'
+          ? 'That is not closed in — the colour would run across the whole sheet.'
+          : 'Nothing to fill there. Tap inside a shape somebody has outlined.',
+      ),
+    )
     surfaceRef.current = s
     return () => {
       surfaceRef.current = null
@@ -106,6 +139,8 @@ export function DrawTurn({
   }, [])
 
   useEffect(() => surfaceRef.current?.setColor(color), [color])
+  useEffect(() => surfaceRef.current?.setTool(tool), [tool])
+  useEffect(() => surfaceRef.current?.setStamp(STAMPS[stampIdx]), [stampIdx])
   useEffect(() => surfaceRef.current?.setSizeIndex(size), [size])
   useEffect(() => surfaceRef.current?.setTuning(tuning), [tuning])
   useEffect(() => surfaceRef.current?.setInkBudget(tuning.inkBudget), [tuning.inkBudget])
@@ -113,6 +148,23 @@ export function DrawTurn({
   useEffect(() => {
     if (strokeCount > 0) setShowHint(false)
   }, [strokeCount])
+
+  useEffect(() => {
+    if (!refusal) return
+    const id = setTimeout(() => setRefusal(null), 3400)
+    return () => clearTimeout(id)
+  }, [refusal])
+
+  // The two tools that multiply are held to the lighter half of the range, so
+  // a wash tints rather than blots. Switching to one while holding ink moves
+  // you to something you can actually use rather than leaving a pen that does
+  // nothing when you drag it.
+  const tintOnly = tool === 'wash' || tool === 'fill'
+  useEffect(() => {
+    if (!tintOnly || washAllowed(color)) return
+    const light = palette.find(washAllowed)
+    if (light) setColor(light)
+  }, [tintOnly, color, palette])
 
   const remaining = Math.max(0, 1 - ink / Math.max(1, budget))
   const zoomLabel = fitScale > 0 ? Math.round((zoom / fitScale) * 100) : 100
@@ -167,6 +219,13 @@ export function DrawTurn({
             </button>
           ))}
           <button
+            className={`tool${tool !== 'pen' ? ' on' : ''}`}
+            onClick={() => setToolsOpen((v) => !v)}
+            aria-label="Other tools"
+          >
+            <ToolsIcon />
+          </button>
+          <button
             className="tool"
             disabled={strokeCount === 0}
             onClick={() => surfaceRef.current?.undo()}
@@ -193,6 +252,11 @@ export function DrawTurn({
         {canvasId && priorLayers.length > 0 && !expired && (
           <ReportButton canvasId={canvasId} className="report-corner" />
         )}
+        {refusal && !expired && (
+          <div className="hint refusal" role="status">
+            {refusal}
+          </div>
+        )}
         {submitError && !expired && (
           <div className="banner" role="alert">
             <span>{submitError}</span>
@@ -217,7 +281,45 @@ export function DrawTurn({
         )}
       </div>
 
-      <PaletteBar palette={palette} value={color} onChange={setColor} />
+      {toolsOpen && (
+        <div className="tooltray">
+          {TOOLS.map((t) => (
+            <button
+              key={t.id}
+              className={`toolchip${tool === t.id ? ' on' : ''}`}
+              onClick={() => {
+                setTool(t.id)
+                if (t.id !== 'stamp') setToolsOpen(false)
+              }}
+            >
+              {t.label}
+            </button>
+          ))}
+          {tool === 'stamp' && (
+            <div className="stamprow">
+              {STAMPS.map((st, i) => (
+                <button
+                  key={st.id}
+                  className={`toolchip${i === stampIdx ? ' on' : ''}`}
+                  onClick={() => {
+                    setStampIdx(i)
+                    setToolsOpen(false)
+                  }}
+                >
+                  {st.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <PaletteBar
+        palette={palette}
+        value={color}
+        onChange={setColor}
+        allow={tintOnly ? washAllowed : undefined}
+      />
     </div>
   )
 }

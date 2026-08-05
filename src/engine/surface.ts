@@ -1,7 +1,26 @@
 import type { Stroke, View } from './types'
 import { StrokeBuilder } from './stroke'
-import { applyView, drawLayers, drawSegments, drawStroke } from './render'
+import { applyView, drawLayers, drawSegments, drawStroke, renderLayers } from './render'
 import { PAPER, PEN_WIDTHS, type Tuning } from '../config'
+import {
+  MARK_FLOOR,
+  STAMPS,
+  type Stamp,
+  type Texture,
+  stampStrokes,
+  textureMarks,
+  traceFill,
+} from './tools'
+
+/**
+ * What the pointer is holding.
+ *
+ * The pen and the wash go through the same StrokeBuilder — a wash *is* a
+ * stroke, just composited differently — so they cost nothing structurally. The
+ * other three do not produce a single continuous line and so bypass the
+ * builder entirely, which is the whole of the complexity they add.
+ */
+export type Tool = 'pen' | 'wash' | 'stamp' | 'hatch' | 'stipple' | 'halftone' | 'fill'
 
 /** The wall around the sheet. Slightly darker than paper so it reads as paper. */
 export const SURROUND = '#D7CFBE'
@@ -85,9 +104,30 @@ export class Surface {
   private sizeIndex = 1
   private turnStart = performance.now()
 
+  private tool: Tool = 'pen'
+  private stamp: Stamp = STAMPS[0]
+  /** Where the texture pen last laid a mark, so marks are spaced by distance
+   *  travelled rather than by how often the OS reported a move. */
+  private lastMark: { x: number; y: number } | null = null
+  private markSeed = { n: 0x9e3779b9 }
+  /** Told when a fill refuses, so the surface can say why rather than doing
+   *  nothing visible and leaving somebody tapping. */
+  private onRefusal: ((why: 'escaped' | 'tiny') => void) | null = null
+
   private pointers = new Map<number, { x: number; y: number }>()
   private penSeen = false
   private drawing: { id: number; builder: StrokeBuilder } | null = null
+  /**
+   * The pointer laying down texture marks, if any.
+   *
+   * Its own field rather than a `drawing` with no builder in it. That was the
+   * first shape and it was wrong within an hour: `inkUsed` reads
+   * `drawing.builder.ink` on every report, so a builder-less drawing threw on
+   * the first mark and the meter stopped moving. A texture drag is genuinely
+   * not a stroke in progress — every mark is already committed — so it should
+   * not be wearing the state that means one is.
+   */
+  private texturing: number | null = null
   private liveDrawn = 0
   private gesture: GestureState | null = null
 
@@ -150,6 +190,20 @@ export class Surface {
     this.sizeIndex = Math.max(0, Math.min(PEN_WIDTHS.length - 1, i))
   }
 
+  setTool(tool: Tool): void {
+    this.abortStroke()
+    this.tool = tool
+    this.lastMark = null
+  }
+
+  setStamp(stamp: Stamp): void {
+    this.stamp = stamp
+  }
+
+  onFillRefused(fn: (why: 'escaped' | 'tiny') => void): void {
+    this.onRefusal = fn
+  }
+
   /**
    * Stops the surface accepting new strokes. Used when the turn clock runs
    * out: the sheet stays visible, the pen just stops working.
@@ -190,6 +244,12 @@ export class Surface {
 
   get isEmpty(): boolean {
     return this.turnStrokes.length === 0 && this.drawing === null
+  }
+
+  /** True while any tool is mid-gesture, which is the only thing callers of
+   *  the old `drawing !== null` actually meant. */
+  get isMarking(): boolean {
+    return this.drawing !== null || this.texturing !== null
   }
 
   undo(): void {
@@ -499,6 +559,12 @@ export class Surface {
   // ----------------------------------------------------------------- input
 
   private baseWidth(): number {
+    // A wash is a broad soft thing or it is a highlighter. Widened here rather
+    // than by adding a fourth pen size, so the three nibs keep meaning what
+    // they mean and a wash is wide at every one of them.
+    if (this.tool === 'wash') {
+      return (this.opts.fixedWidth ?? PEN_WIDTHS[this.sizeIndex]) * 4.5
+    }
     return this.opts.fixedWidth ?? PEN_WIDTHS[this.sizeIndex]
   }
 
@@ -557,6 +623,24 @@ export class Surface {
     // the live layer be append-only.
     if (this.dirty) this.rebuild()
 
+    // The three tools that are not a single continuous line. They land whole
+    // on the way down rather than being accumulated, so they never enter the
+    // builder and never leave a half-finished stroke behind.
+    if (this.tool === 'stamp') {
+      this.placeStamp(lx, ly)
+      return
+    }
+    if (this.tool === 'fill') {
+      this.placeFill(lx, ly)
+      return
+    }
+    if (this.isTexture()) {
+      this.lastMark = null
+      this.texturing = e.pointerId
+      this.layTexture(lx, ly)
+      return
+    }
+
     const remaining = this.opts.inkBudget - this.inkUsed
     const builder = new StrokeBuilder(
       this.color,
@@ -581,6 +665,13 @@ export class Surface {
     if (this.gesture) {
       this.updateGesture()
       this.invalidate()
+      return
+    }
+    if (this.texturing === e.pointerId) {
+      this.layTexture(
+        (c.x - this.view.tx) / this.view.scale,
+        (c.y - this.view.ty) / this.view.scale,
+      )
       return
     }
     if (!this.drawing || this.drawing.id !== e.pointerId) return
@@ -630,6 +721,11 @@ export class Surface {
       this.startViewAnimation()
       return
     }
+    if (this.texturing === e.pointerId) {
+      this.endStroke()
+      this.invalidate()
+      return
+    }
     if (this.drawing && this.drawing.id === e.pointerId) {
       if (e.type === 'pointercancel') this.abortStroke()
       else this.endStroke()
@@ -654,11 +750,21 @@ export class Surface {
   }
 
   private endStroke(): void {
+    if (this.texturing !== null) {
+      this.texturing = null
+      this.lastMark = null
+      this.report()
+      return
+    }
     if (!this.drawing) return
     const b = this.drawing.builder
     const s = b.finish()
     this.drawing = null
     if (s && s.pts.length > 0) {
+      // A wash is an ordinary stroke composited differently, which is why it
+      // costs the engine nothing: same builder, same taper, same ink, one
+      // field set at the end.
+      if (this.tool === 'wash') s.mode = 'w'
       this.turnStrokes.push(s)
       this.clipped(this.tctx, this.cachedView, (ctx) =>
         drawSegments(ctx, s, this.liveDrawn, s.pts.length),
@@ -678,7 +784,124 @@ export class Surface {
     this.report()
   }
 
+  // ----------------------------------------------------------------- tools
+
+  private isTexture(): boolean {
+    return this.tool === 'hatch' || this.tool === 'stipple' || this.tool === 'halftone'
+  }
+
+  /** Every tool commits the same way: append to the turn, paint it onto the
+   *  turn layer, and report. Nothing here can reach the base layer, which is
+   *  the only copy of anybody else's work the surface holds. */
+  private commit(strokes: Stroke[]): void {
+    if (strokes.length === 0) return
+    for (const s of strokes) {
+      this.turnStrokes.push(s)
+      this.clipped(this.tctx, this.cachedView, (ctx) => drawStroke(ctx, s))
+    }
+    this.report()
+    this.invalidate()
+  }
+
+  private placeStamp(lx: number, ly: number): void {
+    const size = 90 + this.sizeIndex * 90
+    // A little rotation, keyed to where it landed, so a row of stamps reads as
+    // placed rather than as tiled. Deterministic: the same tap twice is the
+    // same stamp, which matters because the turn can be undone and redone.
+    const rotation = (((lx * 7 + ly * 13) % 100) / 100 - 0.5) * 0.34
+    const strokes = stampStrokes(
+      this.stamp,
+      lx,
+      ly,
+      size,
+      this.color,
+      this.baseWidth(),
+      Math.round(performance.now() - this.turnStart),
+      rotation,
+    )
+    const cost = strokes.reduce((n, s) => n + s.ink, 0)
+    if (this.inkUsed + cost > this.opts.inkBudget) return
+    this.commit(strokes)
+  }
+
+  /**
+   * Texture marks are spaced by distance travelled, not by pointer events.
+   * A slow drag and a fast one should lay down the same density of ink, or the
+   * tool rewards moving your finger slowly, which is not a skill.
+   */
+  private layTexture(lx: number, ly: number): void {
+    const scale = 2 + this.sizeIndex * 2.4
+    const spacing = scale * (this.tool === 'hatch' ? 2.6 : 3.4)
+
+    if (this.lastMark) {
+      const dx = lx - this.lastMark.x
+      const dy = ly - this.lastMark.y
+      if (Math.hypot(dx, dy) < spacing) return
+    }
+    const angle = this.lastMark
+      ? Math.atan2(ly - this.lastMark.y, lx - this.lastMark.x)
+      : 0
+    this.lastMark = { x: lx, y: ly }
+
+    if (lx < 0 || ly < 0 || lx > this.opts.width || ly > this.opts.height) return
+    if (this.inkUsed + MARK_FLOOR > this.opts.inkBudget) return
+
+    this.commit(
+      textureMarks(
+        this.tool as Texture,
+        lx,
+        ly,
+        angle,
+        scale,
+        this.color,
+        Math.round(performance.now() - this.turnStart),
+        this.markSeed,
+      ),
+    )
+  }
+
+  /**
+   * The fill is traced against paper plus every layer *including this turn* —
+   * what is actually on the sheet, which is what somebody tapping is looking
+   * at. Rendered fresh at full scale rather than read back off the display
+   * canvas, because the display is a blit at whatever the current zoom is and
+   * a fill must not depend on how far somebody happened to be zoomed in.
+   */
+  private placeFill(lx: number, ly: number): void {
+    const source = renderLayers(
+      this.opts.width,
+      this.opts.height,
+      [...this.priorLayers, this.turnStrokes],
+      { scale: 0.5 },
+    )
+    const remaining = this.opts.inkBudget - this.inkUsed
+    const result = traceFill(
+      source,
+      this.opts.width,
+      this.opts.height,
+      lx,
+      ly,
+      this.color,
+      Math.round(performance.now() - this.turnStart),
+    )
+
+    if (!result.stroke) {
+      this.onRefusal?.(result.reason ?? 'tiny')
+      return
+    }
+    if (result.stroke.ink > remaining) {
+      this.onRefusal?.('escaped')
+      return
+    }
+    this.commit([result.stroke])
+  }
+
   private abortStroke(): void {
+    if (this.texturing !== null) {
+      this.texturing = null
+      this.lastMark = null
+      return
+    }
     if (!this.drawing) return
     this.drawing = null
     this.liveDrawn = 0

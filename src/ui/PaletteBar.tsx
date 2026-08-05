@@ -6,6 +6,13 @@ interface Props {
   palette: string[]
   value: string
   onChange: (hex: string) => void
+  /**
+   * Which colours the current tool can actually use. A wash is held to the
+   * lighter half of the range, and the swatch row has to say so before
+   * somebody picks one — the ledger refuses a dark wash, and finding that out
+   * after the drawing is finished would be the worst possible moment.
+   */
+  allow?: (hex: string) => boolean
 }
 
 const LONG_PRESS_MS = 380
@@ -26,7 +33,7 @@ const MOVE_CANCELS_PX = 10
  * sixteen. `colour_allowed()` enforces the same rule server-side, so the UI can
  * never offer something that will be refused after the drawing is done.
  */
-export function PaletteBar({ palette, value, onChange }: Props) {
+export function PaletteBar({ palette, value, onChange, allow }: Props) {
   const [openFamily, setOpenFamily] = useState<string | null>(null)
   const [hue, setHue] = useState(210)
   const [pickingHue, setPickingHue] = useState(false)
@@ -87,7 +94,9 @@ export function PaletteBar({ palette, value, onChange }: Props) {
           {family(openFamily).map((hex) => (
             <button
               key={hex}
-              className={`swatch small${hex === value ? ' on' : ''}`}
+              className={`swatch small${hex === value ? ' on' : ''}${
+                allow && !allow(hex) ? ' off' : ''
+              }`}
               style={{ background: hex, color: contrastInk(hex) }}
               onClick={() => {
                 onChange(hex)
@@ -131,7 +140,9 @@ export function PaletteBar({ palette, value, onChange }: Props) {
         {palette.map((hex) => (
           <button
             key={hex}
-            className={`swatch${hex === value ? ' on' : ''}${openFamily === hex ? ' open' : ''}`}
+            className={`swatch${hex === value ? ' on' : ''}${
+              openFamily === hex ? ' open' : ''
+            }${allow && !allow(hex) ? ' off' : ''}`}
             style={{ background: hex }}
             onPointerDown={(e) => startPress(hex, e)}
             onPointerMove={movePress}
@@ -145,7 +156,9 @@ export function PaletteBar({ palette, value, onChange }: Props) {
         {customs.map((hex) => (
           <button
             key={hex}
-            className={`swatch${hex === value ? ' on' : ''}`}
+            className={`swatch${hex === value ? ' on' : ''}${
+              allow && !allow(hex) ? ' off' : ''
+            }`}
             style={{ background: hex }}
             onPointerDown={(e) => startPress(hex, e)}
             onPointerMove={movePress}
