@@ -482,7 +482,25 @@ stays a choice: Cloudflare R2 and Backblaze B2 both have free tiers that fit an
 archive measured in tens of kilobytes, and AWS S3, Wasabi or a MinIO box all
 work unchanged.
 
-Add these as Actions secrets. Only the first three are required:
+Set it up with:
+
+```bash
+scripts/setup-offsite.sh
+```
+
+It asks for the four values, proves they actually work against the bucket — the
+same write, read, list and delete the nightly job performs — and only then
+stores them. Proving first is the point: a mistyped key stored without checking
+does not announce itself until 03:20 tomorrow, in a job nobody is watching. Keys
+are never echoed, never written to disk, and are piped to `gh` rather than passed
+as arguments, since argv is visible to anything that can run `ps`. Use
+`--dry-run` to check credentials without storing them.
+
+The R2 token needs **Object Read & Write scoped to the one bucket** and nothing
+more — this job never creates or deletes buckets.
+
+The secrets it sets, if you would rather add them by hand. Only the first three
+are required:
 
 ```
 BACKUP_S3_BUCKET              longhand-archive
