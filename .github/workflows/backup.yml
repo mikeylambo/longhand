@@ -4,12 +4,14 @@ name: Backup the archive
 # the one thing here that cannot be regenerated from the repo. So it gets dumped
 # nightly, checked, and kept for thirty days.
 #
-# The dump lands in GitHub Actions artifacts: private to this repository, on a
-# different provider from the database, pruned automatically by retention. That
-# is a real backup against losing the Supabase project, which is the risk being
-# managed. It is *not* a backup against losing the GitHub account — both live
-# there. Worth an off-GitHub copy before this archive is worth anything to
-# anyone; see README, "Backups".
+# The dump lands in two places. GitHub Actions artifacts: private to this
+# repository, pruned automatically by retention, on a different provider from
+# the database. And an S3-compatible bucket, if one is configured — because the
+# repo and its artifacts share a failure domain completely, so artifacts alone
+# protect against losing Supabase and nothing else.
+#
+# The off-site step is skipped, loudly, when no bucket is configured. See
+# README, "Backups".
 
 on:
   schedule:
@@ -91,7 +93,7 @@ jobs:
           PSQL: ${{ env.PSQL }}
         run: ./scripts/backup.sh backups
 
-      - name: Upload
+      - name: Keep it in GitHub
         uses: actions/upload-artifact@v4
         with:
           name: longhand-archive-${{ github.run_id }}
@@ -101,6 +103,40 @@ jobs:
           retention-days: 30
           if-no-files-found: error
           compression-level: 0 # already gzipped
+
+      - name: Copy off GitHub
+        id: offsite
+        # `continue-on-error` covers exactly one case: no bucket configured, in
+        # which case the script exits 78 and the step below turns that into a
+        # visible warning. A configured destination that fails still fails the
+        # job — the script exits 1 and the summary says so.
+        continue-on-error: true
+        env:
+          BACKUP_S3_BUCKET: ${{ secrets.BACKUP_S3_BUCKET }}
+          BACKUP_S3_ACCESS_KEY_ID: ${{ secrets.BACKUP_S3_ACCESS_KEY_ID }}
+          BACKUP_S3_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_S3_SECRET_ACCESS_KEY }}
+          BACKUP_S3_ENDPOINT: ${{ secrets.BACKUP_S3_ENDPOINT }}
+          BACKUP_S3_REGION: ${{ secrets.BACKUP_S3_REGION }}
+          BACKUP_S3_PREFIX: ${{ secrets.BACKUP_S3_PREFIX }}
+        run: ./scripts/offsite.sh backups
+
+      - name: Judge the off-site result
+        run: |
+          set -euo pipefail
+          case "${{ steps.offsite.outcome }}" in
+            success)
+              echo "OFFSITE=copied" >> "$GITHUB_ENV" ;;
+            *)
+              if [[ -z "${{ secrets.BACKUP_S3_BUCKET }}" ]]; then
+                # Unconfigured is a decision that should keep being visible,
+                # not a silence that becomes the status quo.
+                echo "::warning title=Archive has only one copy::No off-site backup is configured. The dump exists only in GitHub artifacts, which share a failure domain with this repository. See README, 'Backups'."
+                echo "OFFSITE=not configured" >> "$GITHUB_ENV"
+              else
+                echo "::error title=Off-site copy failed::A destination is configured but the copy did not succeed. See the step log."
+                exit 1
+              fi ;;
+          esac
 
       - name: Say what was kept
         run: |
@@ -112,6 +148,7 @@ jobs:
           echo "| layers | ${{ steps.backup.outputs.layers }} |" >> "$GITHUB_STEP_SUMMARY"
           echo "| compressed | ${{ steps.backup.outputs.size }} bytes |" >> "$GITHUB_STEP_SUMMARY"
           echo "| kept until | 30 days from now |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| off-site | $OFFSITE |" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Shout
         if: failure()

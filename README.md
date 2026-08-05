@@ -470,14 +470,46 @@ The one step not yet exercised is dumping production itself, which needs
 `SUPABASE_DB_URL`. Trigger the workflow manually once the secret exists and
 check the run summary before trusting the schedule.
 
-### What this does not protect against
+### The off-site copy
 
-The dumps live in GitHub Actions artifacts — a different provider from the
-database, which is the risk being managed, and private to this repository. They
-do **not** survive losing the GitHub account, since the repo and the backups sit
-in the same place. Before this archive matters to anyone but us, one of these
-nightly artifacts should be copied somewhere else entirely. The workflow is a
-single upload step; adding a second destination is a small change.
+Artifacts protect against losing the Supabase project. They protect against
+nothing else, because the repository and its artifacts share a failure domain
+completely — one compromised or closed GitHub account takes both.
+
+So the workflow also copies each night's dump to an S3-compatible bucket, if one
+is configured. S3-compatible rather than a specific provider, so the destination
+stays a choice: Cloudflare R2 and Backblaze B2 both have free tiers that fit an
+archive measured in tens of kilobytes, and AWS S3, Wasabi or a MinIO box all
+work unchanged.
+
+Add these as Actions secrets. Only the first three are required:
+
+```
+BACKUP_S3_BUCKET              longhand-archive
+BACKUP_S3_ACCESS_KEY_ID       …
+BACKUP_S3_SECRET_ACCESS_KEY   …
+BACKUP_S3_ENDPOINT            https://<account>.r2.cloudflarestorage.com
+BACKUP_S3_REGION              auto        (default; correct for R2)
+BACKUP_S3_PREFIX              longhand    (default)
+```
+
+**Until they exist the job still succeeds, but says so every night** — a warning
+annotation on every run reading *"Archive has only one copy"*. Unconfigured is a
+decision, and it should keep being visible rather than settling into silence. A
+destination that *is* configured and fails is a hard failure, because that is
+something broken rather than something not yet chosen.
+
+Every upload is read back and its size compared before the run is called a
+success — a truncated upload is the same class of problem as a truncated dump.
+Pruning keeps the newest thirty days and refuses outright if it would remove
+more than ten objects at once, since a normal night retires two and anything
+wholesale means the naming or the listing changed shape. Deleting backups on a
+guess is not something a script should do.
+
+A bucket lifecycle rule would also work for expiry and needs no code. The prune
+is in the job so that the whole thing is described in one place and cannot be
+half-configured, but if you would rather set a 30-day rule in the provider,
+delete the prune and nothing else changes.
 
 ## Rules for operating on the ledger
 

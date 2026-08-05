@@ -1,0 +1,16 @@
+# The CLI uploads the working directory, and it does not use .gitignore for
+# that. Without this, `vercel deploy` ships .env.local to the build — which
+# means the build silently depends on a file that only exists on one laptop,
+# and any secret that ever lands in it goes with it. Environment comes from
+# Vercel's own project settings, and nowhere else.
+.env
+.env.*
+!.env.example
+!.env.test.example
+
+node_modules
+dist
+backups
+supabase/.temp
+test-results
+playwright-report
