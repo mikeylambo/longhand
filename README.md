@@ -1116,7 +1116,14 @@ worth something first.
 
 ## Before this goes in front of strangers
 
-Everything on the roadmap is built. What is left is not code:
+Everything on the roadmap is built. **None of it is deployed** — production is
+at migration 0016, and 0017 through 0028 exist only in this repository.
+`docs/deploy.md` is the order and the reason for the order, the short version
+being that the migrations go first because the client that is live today keeps
+working against the new schema and the new client does not work against the
+old one.
+
+After that, what is left is not code:
 
 1. **Seed the production database with the format rotation in place**, or let it
    fill naturally. Existing canvases are all twelves and stay that way; the
