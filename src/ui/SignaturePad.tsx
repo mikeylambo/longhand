@@ -9,6 +9,7 @@ import {
   TUNING,
 } from '../config'
 import type { Stroke } from '../engine/types'
+import { Footer } from './Footer'
 
 interface Props {
   /** Persistence is the session's job — local mode keeps it in the browser,
@@ -49,14 +50,27 @@ export function SignaturePad({ onDone }: Props) {
   return (
     <div className="panel">
       <h1>Your mark</h1>
+      {/* This screen used to sit between a stranger and drawing with no
+          explanation of why it was there, which made it feel like a form. It
+          is the opposite of a form: it is the only identity this product has,
+          and it is how anything you make gets credited to you. */}
       <p>
-        Sign once. It travels with everything you draw and it is the only name
-        you get — there is no username here, and no way to write one.
+        Sign once, by hand. It goes on the back of every canvas you draw on and
+        it is the only name you get — there is no username here, and no way to
+        write one.
+      </p>
+      <p className="stat">
+        Anything at all: initials, a squiggle, a shape. Nobody is checking it
+        against anything, and it is not asking who you are.
       </p>
 
       <div className="sigbox" ref={hostRef}>
         <div className="sigline" />
       </div>
+
+      {/* The actions belong at the bottom of the screen, not floating under
+          the box with three hundred pixels of nothing beneath them. */}
+      <div className="spacer" />
 
       <div className="row">
         <button
@@ -79,6 +93,8 @@ export function SignaturePad({ onDone }: Props) {
           This is my mark
         </button>
       </div>
+
+      <Footer />
     </div>
   )
 }

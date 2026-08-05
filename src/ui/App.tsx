@@ -6,8 +6,9 @@ import { loadSignature, type StoredSignature } from '../store'
 import { SignaturePad } from './SignaturePad'
 import { DrawTurn } from './DrawTurn'
 import { Review } from './Review'
+import { Welcome, markWelcomed, seenWelcome } from './Welcome'
 
-type Phase = 'loading' | 'signature' | 'draw' | 'review' | 'error'
+type Phase = 'loading' | 'welcome' | 'signature' | 'draw' | 'review' | 'error'
 
 const message = (e: unknown) =>
   e instanceof Error ? e.message : 'something went wrong'
@@ -45,24 +46,47 @@ export function App() {
     loadSignature(),
   )
 
+  /**
+   * Claiming a slot, on every path that leads to one.
+   *
+   * `fresh` is the difference between carrying on and starting over, and only
+   * local mode can tell them apart: with no ledger the relay is faked in one
+   * browser, so "next slot" means the next slot on this fake canvas until it
+   * fills. Against the ledger both mean the same thing, because one hand per
+   * canvas makes drawing again necessarily somewhere else.
+   */
+  const take = useCallback(
+    async (slots?: number, fresh = false) => {
+      setPhase('loading')
+      setError(null)
+      try {
+        const joined = fresh
+          ? await session.nextCanvas(slots)
+          : await session.join(slots)
+        transition(() => {
+          setJustDrawn([])
+          setCanvas(joined)
+          setPhase('draw')
+        })
+      } catch (e) {
+        setError(message(e))
+        setPhase('error')
+      }
+    },
+    [session],
+  )
+
   const boot = useCallback(async () => {
     setPhase('loading')
     setError(null)
-    try {
-      if (!session.hasSignature()) {
-        setPhase('signature')
-        return
-      }
-      const joined = await session.join()
-      transition(() => {
-        setCanvas(joined)
-        setPhase('draw')
-      })
-    } catch (e) {
-      setError(message(e))
-      setPhase('error')
+    // A returning hand goes straight to a sheet. The welcome screen is for
+    // somebody who has never seen this, and seeing it twice would be a lecture.
+    if (!session.hasSignature()) {
+      setPhase(seenWelcome() ? 'signature' : 'welcome')
+      return
     }
-  }, [session])
+    await take()
+  }, [session, take])
 
   useEffect(() => {
     void boot()
@@ -90,6 +114,17 @@ export function App() {
     )
   }
 
+  if (phase === 'welcome') {
+    return (
+      <Welcome
+        onStart={() => {
+          markWelcomed()
+          transition(() => setPhase('signature'))
+        }}
+      />
+    )
+  }
+
   if (phase === 'signature') {
     return (
       <SignaturePad
@@ -97,12 +132,8 @@ export function App() {
           setPhase('loading')
           try {
             await session.registerSignature(strokes)
-            const joined = await session.join()
-            transition(() => {
-              setSignature(loadSignature())
-              setCanvas(joined)
-              setPhase('draw')
-            })
+            setSignature(loadSignature())
+            await take()
           } catch (e) {
             setError(message(e))
             setPhase('error')
@@ -121,19 +152,7 @@ export function App() {
         layer={justDrawn}
         signature={signature}
         mode={session.mode}
-        onNext={async () => {
-          setPhase('loading')
-          try {
-            setCanvas(
-              canvas.closed ? await session.nextCanvas() : await session.join(),
-            )
-            setJustDrawn([])
-            setPhase('draw')
-          } catch (e) {
-            setError(message(e))
-            setPhase('error')
-          }
-        }}
+        onNext={(slots) => void take(slots, canvas.closed)}
       />
     )
   }
@@ -143,24 +162,14 @@ export function App() {
       key={`${canvas.turnId ?? canvas.canvasId ?? canvas.seed}-${canvas.slot}`}
       seed={canvas.seed}
       slot={canvas.slot}
+      slotCount={canvas.slotCount}
       palette={canvas.palette}
       priorLayers={canvas.priorLayers}
       width={canvas.width}
       height={canvas.height}
       expiresAt={canvas.expiresAt}
-      onExpired={async () => {
-        setPhase('loading')
-        try {
-          const next = await session.nextCanvas()
-          transition(() => {
-            setCanvas(next)
-            setPhase('draw')
-          })
-        } catch (e) {
-          setError(message(e))
-          setPhase('error')
-        }
-      }}
+      canvasId={canvas.canvasId}
+      onExpired={() => void take(undefined, true)}
       submitting={submitting}
       submitError={submitError}
       onDismissError={() => setSubmitError(null)}
