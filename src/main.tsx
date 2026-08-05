@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client'
 import { App } from './ui/App'
 import { CanvasPage } from './ui/CanvasPage'
 import { Gallery } from './ui/Gallery'
+import { DocPage } from './ui/DocPage'
+import { DOCS } from './content/legal'
 import { SelfTestPage } from './dev/SelfTestPage'
 import './styles.css'
 
@@ -18,6 +20,9 @@ function route(): ReactNode {
 
   const path = location.pathname.replace(/\/+$/, '') || '/'
   if (path === '/gallery') return <Gallery />
+
+  const doc = DOCS.find((d) => path === `/${d.slug}`)
+  if (doc) return <DocPage doc={doc} />
 
   const canvas = path.match(/^\/c\/([0-9a-f-]{36})$/i)
   if (canvas) return <CanvasPage canvasId={canvas[1]} />
