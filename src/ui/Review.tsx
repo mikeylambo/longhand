@@ -2,21 +2,20 @@ import { useMemo } from 'react'
 import type { Stroke } from '../engine/types'
 import { renderLayers } from '../engine/render'
 import { countPoints, decodeLayer, encodeLayer } from '../engine/codec'
-import {
-  SIGNATURE_H,
-  SIGNATURE_W,
-  SLOTS_PER_CANVAS,
-} from '../config'
+import { FORMATS, SIGNATURE_H, SIGNATURE_W, formatFor } from '../config'
 import type { StoredSignature } from '../store'
 import type { CanvasState } from '../data/session'
 import { Replay } from './Replay'
+import { Footer } from './Footer'
 
 interface Props {
   canvas: CanvasState
   layer: Stroke[]
   signature: StoredSignature | null
   mode: 'local' | 'ledger'
-  onNext: () => void
+  /** `slots` asks for a format on the next canvas; left off, the ledger sends
+   *  you wherever is closest to closing. */
+  onNext: (slots?: number) => void
 }
 
 export function Review({ canvas, layer, signature, mode, onNext }: Props) {
@@ -53,6 +52,8 @@ export function Review({ canvas, layer, signature, mode, onNext }: Props) {
   )
   const ink = layer.reduce((n, s) => n + s.ink, 0)
   const slot = canvas.justFilledSlot ?? canvas.slot
+  const format = formatFor(canvas.slotCount)
+  const waiting = Math.max(0, canvas.slotCount - slot)
 
   const download = () => {
     const blob = new Blob([JSON.stringify(encoded)], {
@@ -68,11 +69,13 @@ export function Review({ canvas, layer, signature, mode, onNext }: Props) {
 
   return (
     <div className="panel">
-      <h1>{canvas.closed ? 'This canvas is closed' : 'Locked'}</h1>
+      <h1>{canvas.closed ? 'That closed it' : 'Yours is on it'}</h1>
       <p>
         {canvas.closed
-          ? `Twelve hands, one sheet. “${canvas.seed}” is finished and can never be changed.`
-          : `Slot ${slot} of ${SLOTS_PER_CANVAS} on “${canvas.seed}”. Nothing you drew can be removed by anyone who comes after you.`}
+          ? `“${canvas.seed}” is finished — ${format.hands} hands, one sheet, and it can never be changed.`
+          : waiting === 1
+            ? `Slot ${slot} of ${canvas.slotCount} on “${canvas.seed}”. One more hand and it closes.`
+            : `Slot ${slot} of ${canvas.slotCount} on “${canvas.seed}”. ${waiting} more hands and it closes. Nothing you drew can be removed by anyone who comes after you.`}
       </p>
 
       <div className="scroll">
@@ -93,42 +96,59 @@ export function Review({ canvas, layer, signature, mode, onNext }: Props) {
           height={height}
         />
 
-        <div className="review-caption">Ledger</div>
+        <div className="review-caption">In the ledger</div>
         <div className="stat">
           {layer.length} {layer.length === 1 ? 'stroke' : 'strokes'} ·{' '}
-          {countPoints(roundTripped)} points ·{' '}
-          {Math.round(ink)} px of ink · {(bytes / 1024).toFixed(1)} KB encoded
+          {countPoints(roundTripped)} points · {Math.round(ink)} px of ink ·{' '}
+          {(bytes / 1024).toFixed(1)} KB
         </div>
         <div className="stat">
           {mode === 'ledger'
-            ? 'Written to the ledger. Append-only — it can be hidden, never deleted.'
+            ? 'Written and locked. Append-only — it can be hidden, never deleted.'
             : 'Local mode: nothing was persisted. Set the Supabase env vars to write to the ledger.'}
         </div>
         <div className="row">
           {canvas.canvasId && (
             <a className="linkbtn" href={`/c/${canvas.canvasId}`}>
-              Its own page
+              {canvas.closed ? 'See it finished' : 'Its own page'}
             </a>
           )}
-          <button className="linkbtn" onClick={download}>
-            Download layer JSON
+          <button className="linkbtn quiet" onClick={download}>
+            Download the layer
           </button>
         </div>
+        {!canvas.closed && canvas.canvasId && (
+          <p className="stat">
+            That page is where it will be when the last hand lands. Keep the
+            link — there is nothing else that will tell you.
+          </p>
+        )}
       </div>
 
       <div className="row">
-        {mode === 'ledger' && (
-          <a className="linkbtn" href="/gallery">
-            Gallery
-          </a>
-        )}
         <div className="spacer" />
-        <button className="linkbtn solid" onClick={onNext}>
+        <button className="linkbtn solid" onClick={() => onNext()}>
           {/* One hand per canvas is the premise, so drawing again means being
               sent to a different sheet — not back to this one. */}
           {mode === 'ledger' ? 'Draw on another canvas' : 'Take the next slot'}
         </button>
       </div>
+
+      {mode === 'ledger' && (
+        <p className="chooser">
+          or ask for{' '}
+          {FORMATS.map((f, i) => (
+            <span key={f.slots}>
+              {i > 0 && ' · '}
+              <button className="asif" onClick={() => onNext(f.slots)}>
+                {f.name}
+              </button>
+            </span>
+          ))}
+        </p>
+      )}
+
+      <Footer gallery={mode === 'ledger'} />
     </div>
   )
 }

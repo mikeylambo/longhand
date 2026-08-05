@@ -119,15 +119,63 @@ export interface ClaimResult {
  * live turn instead of claiming a second — `resumed` says which happened. The
  * palette is fixed at claim time and travels on the turn, so it cannot shift
  * under a player who is halfway through drawing.
+ *
+ * `slots` asks for a format. Left off, the database picks the canvas closest
+ * to closing, which is what a stranger should get: the best odds that the hand
+ * they are about to add is the one that finishes something.
  */
-export async function claimTurn(signatureId: string): Promise<ClaimResult> {
+export async function claimTurn(
+  signatureId: string,
+  slots?: number,
+): Promise<ClaimResult> {
   const db = requireSupabase()
   const { data, error } = await db.rpc('claim_turn', {
     p_signature: signatureId,
     p_device_key: deviceKey(),
+    ...(slots ? { p_slots: slots } : {}),
   })
   if (error) throw new Error(`could not find you a slot: ${error.message}`)
   return data as ClaimResult
+}
+
+export interface FormatRow {
+  slot_count: number
+  label: string
+  weight: number
+}
+
+/** The sizes a canvas may be opened at. The table is the authority, not the
+ *  client's names for them. */
+export async function fetchFormats(): Promise<FormatRow[]> {
+  const db = requireSupabase()
+  const { data, error } = await db
+    .from('canvas_formats')
+    .select('slot_count, label, weight')
+    .order('slot_count', { ascending: true })
+  if (error) throw new Error(`could not load the formats: ${error.message}`)
+  return (data ?? []) as FormatRow[]
+}
+
+/**
+ * One tap. There is no form, no category and no text field — the drawing is
+ * the only channel this product has, and a reason box would be a message box
+ * wearing a different name.
+ *
+ * The server collapses a second tap from the same browser and drops a flood
+ * without saying so, so this resolves the same way whatever happened to it.
+ * The only thing a reporter is told is that it was received.
+ */
+export async function reportContent(
+  canvasId: string,
+  layerId: string | null = null,
+): Promise<void> {
+  const db = requireSupabase()
+  const { error } = await db.rpc('report_content', {
+    p_canvas: canvasId,
+    p_layer: layerId,
+    p_device_key: deviceKey(),
+  })
+  if (error) throw new Error(`that report did not send: ${error.message}`)
 }
 
 /** Hands a slot back early rather than making the canvas wait out the timer. */
@@ -215,6 +263,33 @@ export async function submitTurn(
   })
   if (error) throw new Error(`your layer was not saved: ${error.message}`)
   return data as { layer: LayerRow; canvas: CanvasRow }
+}
+
+/**
+ * What the next arrival would most likely join, for the line on the welcome
+ * screen that says something is already underway.
+ *
+ * A preview, not a promise: it reads the oldest open canvases and picks the
+ * one closest to closing the same way `claim_turn` does, but without the lock
+ * or the live-turn predicate, because the answer is a sentence rather than a
+ * slot. By the time anyone signs and claims, it may well be a different sheet.
+ */
+export async function fetchCanvasInProgress(): Promise<CanvasRow | null> {
+  const db = requireSupabase()
+  const { data, error } = await db
+    .from('canvases')
+    .select('*')
+    .neq('status', 'closed')
+    .order('created_at', { ascending: true })
+    .limit(20)
+  if (error) return null
+  const open = ((data ?? []) as CanvasRow[]).filter(
+    (c) => c.slots_filled > 0 && c.slots_filled < c.slot_count,
+  )
+  if (open.length === 0) return null
+  return open.reduce((best, c) =>
+    c.slot_count - c.slots_filled < best.slot_count - best.slots_filled ? c : best,
+  )
 }
 
 /**

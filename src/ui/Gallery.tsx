@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { renderLayers } from '../engine/render'
-import { CANVAS_H, CANVAS_W } from '../config'
+import { CANVAS_H, CANVAS_W, formatFor } from '../config'
 import { fetchClosedCanvases, fetchLayers, type CanvasRow } from '../data/ledger'
 import { LEDGER_ENABLED } from '../lib/supabase'
+import { Footer } from './Footer'
 
 /**
  * The archive. Per the brief this is the asset — the thing that gets more
@@ -26,15 +27,18 @@ export function Gallery() {
   return (
     <div className="panel">
       <h1>The gallery</h1>
-      <p>Canvases that twelve hands finished. Nothing here can change again.</p>
+      <p>
+        Canvases every hand has been on. Nothing here can change again — not by
+        the people who drew it, and not by us.
+      </p>
 
       <div className="scroll">
         {error && <p className="stat">{error}</p>}
         {!error && !canvases && <p className="stat">Loading…</p>}
         {canvases?.length === 0 && (
           <p className="stat">
-            Nothing has closed yet. The first canvas to reach twelve hands lands
-            here.
+            Nothing has closed yet. The first canvas to fill lands here — a duo
+            needs two hands, so it may not be long.
           </p>
         )}
         <div className="cards">
@@ -50,6 +54,8 @@ export function Gallery() {
           Take a slot
         </a>
       </div>
+
+      <Footer />
     </div>
   )
 }
@@ -86,7 +92,7 @@ function GalleryCard({ canvas }: { canvas: CanvasRow }) {
       )}
       <figcaption>
         <span className="seed-small">“{canvas.seed_word}”</span>
-        <span>{canvas.slots_filled} hands</span>
+        <span>{formatFor(canvas.slot_count).title}</span>
       </figcaption>
     </a>
   )

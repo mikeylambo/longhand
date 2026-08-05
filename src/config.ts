@@ -18,6 +18,49 @@ export const CANVAS_H = 2048
 export const SLOTS_PER_CANVAS = 12
 export const TURN_MS = 10 * 60 * 1000
 
+/**
+ * The sizes a canvas can be opened at.
+ *
+ * Twelve is the brief and stays the flagship. Duos and quartets exist because
+ * of arithmetic rather than variety: with a small population a twelve may
+ * never close, and a stranger who draws into a canvas that never closes gets
+ * one twelfth of the product — no finished piece, no timelapse, no video, no
+ * hand of their own on bare paper. A duo closes with one other person.
+ *
+ * `canvas_formats` in the database is the authority: it decides what may be
+ * asked for and what share of new canvases opens at each size. These names are
+ * only how the sizes are *spoken*, which belongs next to the rest of the copy.
+ * tests/ledger.spec.ts asserts every format in the table has a name here.
+ */
+export const FORMATS = [
+  { slots: 2, name: 'a duo', title: 'Duo', hands: 'two' },
+  { slots: 4, name: 'a quartet', title: 'Quartet', hands: 'four' },
+  { slots: 12, name: 'twelve hands', title: 'Twelve hands', hands: 'twelve' },
+] as const
+
+export interface Format {
+  slots: number
+  name: string
+  title: string
+  hands: string
+}
+
+/**
+ * A size the client has never heard of still has to read as English, because
+ * the table can gain a format without a deploy — that is the point of it being
+ * a table.
+ */
+export function formatFor(slots: number): Format {
+  return (
+    FORMATS.find((f) => f.slots === slots) ?? {
+      slots,
+      name: `${slots} hands`,
+      title: `${slots} hands`,
+      hands: String(slots),
+    }
+  )
+}
+
 /** Paper. Everything composites additively over this and never subtracts. */
 export const PAPER = '#F2EDE3'
 

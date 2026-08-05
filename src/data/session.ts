@@ -26,6 +26,9 @@ export interface CanvasState {
   /** The sheet this canvas was opened at, not the current default. */
   width: number
   height: number
+  /** How many hands this canvas takes — 2, 4 or 12. Read from the canvas,
+   *  never from a constant, for the same reason width and height are. */
+  slotCount: number
   /** The slot this player is about to fill, 1-based. */
   slot: number
   /**
@@ -47,9 +50,11 @@ export interface Session {
   readonly mode: 'local' | 'ledger'
   registerSignature(strokes: Stroke[]): Promise<void>
   hasSignature(): boolean
-  join(): Promise<CanvasState>
+  /** `slots` asks for a format. Left off, the ledger sends you to whatever is
+   *  closest to closing. */
+  join(slots?: number): Promise<CanvasState>
   submit(layer: Stroke[]): Promise<CanvasState>
-  nextCanvas(): Promise<CanvasState>
+  nextCanvas(slots?: number): Promise<CanvasState>
   /** Hands the slot back rather than making the canvas wait out the clock. */
   abandon(): Promise<void>
 }
@@ -70,6 +75,7 @@ class LocalSession implements Session {
   private seed = pickSeed()
   private layers: Stroke[][] = []
   private expiresAt: number | null = null
+  private slotCount = SLOTS_PER_CANVAS
 
   hasSignature(): boolean {
     return Boolean(localStorage.getItem('longhand.signature.v1'))
@@ -79,7 +85,8 @@ class LocalSession implements Session {
     saveSignature(strokes)
   }
 
-  async join(): Promise<CanvasState> {
+  async join(slots?: number): Promise<CanvasState> {
+    if (slots) this.slotCount = slots
     this.expiresAt = Date.now() + TURN_MS
     return this.state()
   }
@@ -90,9 +97,10 @@ class LocalSession implements Session {
     return this.state(this.layers.length)
   }
 
-  async nextCanvas(): Promise<CanvasState> {
+  async nextCanvas(slots?: number): Promise<CanvasState> {
     this.seed = pickSeed()
     this.layers = []
+    this.slotCount = slots ?? SLOTS_PER_CANVAS
     return this.join()
   }
 
@@ -106,7 +114,8 @@ class LocalSession implements Session {
       seed: this.seed,
       width: CANVAS_W,
       height: CANVAS_H,
-      slot: Math.min(this.layers.length + 1, SLOTS_PER_CANVAS),
+      slotCount: this.slotCount,
+      slot: Math.min(this.layers.length + 1, this.slotCount),
       justFilledSlot,
       priorLayers: this.layers,
       replayLayers: this.layers.map((strokes, i) => ({
@@ -114,7 +123,7 @@ class LocalSession implements Session {
         strokes,
       })),
       palette: paletteFor(this.layers, this.seed),
-      closed: this.layers.length >= SLOTS_PER_CANVAS,
+      closed: this.layers.length >= this.slotCount,
       turnId: null,
       expiresAt: this.expiresAt,
     }
@@ -139,11 +148,11 @@ class LedgerSession implements Session {
    * back an unfinished turn rather than a new one if this browser already holds
    * one — so a reload does not cost a slot.
    */
-  async join(): Promise<CanvasState> {
+  async join(slots?: number): Promise<CanvasState> {
     const signatureId = cachedSignatureId()
     if (!signatureId) throw new Error('no signature registered for this browser')
 
-    const { turn, canvas } = await claimTurn(signatureId)
+    const { turn, canvas } = await claimTurn(signatureId, slots)
     this.turnId = turn.id
 
     const layers = await fetchLayers(canvas.id)
@@ -152,6 +161,7 @@ class LedgerSession implements Session {
       seed: canvas.seed_word,
       width: canvas.width ?? CANVAS_W,
       height: canvas.height ?? CANVAS_H,
+      slotCount: canvas.slot_count ?? SLOTS_PER_CANVAS,
       slot: turn.slot_index,
       justFilledSlot: null,
       priorLayers: layers.map((l) => l.strokes),
@@ -178,6 +188,7 @@ class LedgerSession implements Session {
       seed: canvas.seed_word,
       width: canvas.width ?? CANVAS_W,
       height: canvas.height ?? CANVAS_H,
+      slotCount: canvas.slot_count ?? SLOTS_PER_CANVAS,
       slot: Math.min(layers.length + 1, canvas.slot_count),
       justFilledSlot: row.slot_index,
       priorLayers: layers.map((l) => l.strokes),
@@ -196,9 +207,9 @@ class LedgerSession implements Session {
    * There is no "next slot on this canvas" — one hand per canvas is the whole
    * premise, so drawing again means being sent somewhere else.
    */
-  async nextCanvas(): Promise<CanvasState> {
+  async nextCanvas(slots?: number): Promise<CanvasState> {
     this.turnId = null
-    return this.join()
+    return this.join(slots)
   }
 
   async abandon(): Promise<void> {
@@ -212,6 +223,11 @@ export function createSession(): Session {
   return LEDGER_ENABLED ? new LedgerSession() : new LocalSession()
 }
 
+/** A layer as the canvas page needs it: drawable, and reportable on its own. */
+export interface ViewLayer extends ReplayLayer {
+  id: string
+}
+
 /** Used by the shareable canvas page, which has no session and no turn. */
 export async function loadCanvasForViewing(canvasId: string): Promise<{
   seed: string
@@ -220,7 +236,7 @@ export async function loadCanvasForViewing(canvasId: string): Promise<{
   closed: boolean
   slotCount: number
   closedAt: string | null
-  layers: ReplayLayer[]
+  layers: ViewLayer[]
 } | null> {
   const canvas = await fetchCanvas(canvasId)
   if (!canvas) return null
@@ -232,6 +248,10 @@ export async function loadCanvasForViewing(canvasId: string): Promise<{
     closed: canvas.status === 'closed',
     slotCount: canvas.slot_count,
     closedAt: canvas.closed_at,
-    layers: layers.map((l) => ({ slotIndex: l.slotIndex, strokes: l.strokes })),
+    layers: layers.map((l) => ({
+      id: l.id,
+      slotIndex: l.slotIndex,
+      strokes: l.strokes,
+    })),
   }
 }
