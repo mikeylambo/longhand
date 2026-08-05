@@ -100,9 +100,20 @@ echo ""
 # is never stood down. Restoring into a database that still holds real history
 # is not a thing this script will do quietly — that is what the refusal above is
 # for, and why the default target is a local stack.
+#
+# Every table the dump carries has to be named here, including the reference
+# ones the migrations populate: the schema is built from migrations *before*
+# this runs, so those tables already hold rows and the dump's would collide
+# with them. That is how `canvas_formats` was caught — by a restore drill
+# failing on a duplicate key, not by anyone reading this list. Restoring an
+# artifact older than a table is the other direction: that COPY is simply not
+# in the file, the table is left empty, and the migration that fills it has to
+# be re-applied before the load will satisfy its foreign keys.
 "$PSQL" "$TARGET" --quiet -v ON_ERROR_STOP=1 -c \
-  "truncate public.layers, public.turns, public.canvases, public.signatures,
-            public.seeds, public.palette_colors cascade;" >/dev/null 2>"$ERR" \
+  "truncate public.reports, public.moderation_actions,
+            public.layers, public.turns, public.canvases, public.signatures,
+            public.seeds, public.palette_colors, public.canvas_formats cascade;" \
+  >/dev/null 2>"$ERR" \
   || fail "could not clear the target before loading." "$ERR"
 
 # gunzip -c so the archive on disk is never consumed; a restore must be
@@ -121,8 +132,9 @@ echo "Restored. Counting what arrived:"
 FAILED=0
 read_count() { "$PSQL" "$TARGET" -tAc "select count(*) from public.$1"; }
 
-for t in canvases layers signatures turns seeds palette_colors; do
-  printf '  %-16s %s\n' "$t" "$(read_count "$t")"
+for t in canvases layers signatures turns seeds palette_colors canvas_formats \
+         reports moderation_actions; do
+  printf '  %-18s %s\n' "$t" "$(read_count "$t")"
 done
 
 check() { # name expected actual

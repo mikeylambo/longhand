@@ -45,7 +45,16 @@ PG_DUMP="${PG_DUMP:-pg_dump}"
 
 # Tables whose contents are the archive. A dump missing rows from any of these
 # is a failure, not a warning.
-TABLES=(canvases layers signatures turns seeds palette_colors)
+#
+# `reports` and `moderation_actions` are here because the record of what was
+# reported and what was done about it is part of the history, not metadata
+# about it — "we only ever hide, we never delete" is a claim, and this is the
+# evidence for it. `canvas_formats` is reference data the migrations own, but
+# it is dumped anyway: its weights are meant to be changed in production
+# without a deploy, and a restore that quietly reverted them would undo a
+# decision somebody made.
+TABLES=(canvases layers signatures turns seeds palette_colors canvas_formats
+        reports moderation_actions)
 
 if [[ -z "${DATABASE_URL:-}" ]]; then
   echo "FAIL: DATABASE_URL is not set." >&2
