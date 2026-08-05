@@ -51,7 +51,7 @@ export const TERMS: Doc = {
         'We will not sell your layer on its own, or licence it on its own to anyone else.',
         'We will not use your work to train machine-learning models, and we will not licence it to anybody else for that purpose.',
         'We will not put your work in advertising for something that is not Longhand.',
-        'If prints of finished canvases are ever sold, every contributor to that canvas will be told before it happens and will be able to decline having their layer reproduced in something sold. Declining removes your layer from the printed edition; it does not remove it from the canvas or from the archive.',
+        'If prints of finished canvases are ever sold, every contributor to that canvas will be told before it happens and will be able to decline having their layer reproduced in something sold. That is not a policy we intend to keep in good faith — it is how the feature is built: asking for a print asks everybody who drew on the canvas, nothing is made until all of them have said yes, and a single no ends it. Declining removes your layer from the printed edition; it does not remove it from the canvas or from the archive.',
       ],
     },
     {
@@ -73,9 +73,12 @@ export const TERMS: Doc = {
     {
       heading: 'What we collect',
       paragraphs: [
-        'A random identifier stored in your browser, which is how a returning hand is recognised as the same hand. It is generated, not measured: nothing about your device, your location or you is derived from it or sent to us.',
+        'A random identifier stored in your browser, which is how a returning hand is recognised as the same hand. It is generated, not measured: nothing about your device, your location or you is derived from it or sent to us. You can attach more than one browser to the same mark with a recovery key, which is a random string we store only the digest of.',
+        'A city, if the person who opened a canvas chose one. It belongs to the canvas and not to anybody who drew on it, it is picked from a list, and nothing here ever asks a browser where it is — there is no location permission prompt in this product because there is no code that could use one.',
+        'If you turn notifications on: the address your browser gives us to send them to, and the two keys that address needs. Turning them off deletes it.',
         'Your signature and your layers, which are the product.',
         'No email address, no name, no password, no analytics, no advertising identifiers, no third-party trackers. There is no account to delete because there is no account.',
+        'A classroom has a name, chosen by whoever opened it, and a code. That is the only free text anybody types into this product, it is visible only to that class, and it is not attached to a person.',
         'Clearing your browser storage loses your identity here permanently. There is no recovery, because there is nothing to recover it with.',
       ],
     },
@@ -100,14 +103,16 @@ export const SAFETY: Doc = {
       paragraphs: [
         'Longhand is for people aged 13 and over. If you are younger than that, this is not for you yet — not because of anything you would do, but because a public canvas that strangers draw on is not something we can supervise for you.',
         'There is no age form, and that is deliberate. A date-of-birth box collects a piece of personal information about a child in order to turn them away, and it stops nobody. The honest position is a stated minimum age, a product that collects nothing about anyone, and moderation that works.',
-        'Classrooms are the exception we intend to build properly rather than fudge: private canvases run by a teacher, on a school account, with the class as the only participants. That does not exist yet. Until it does, a school using the public canvases should treat them as a public space, because they are one.',
+        'Classrooms are the exception, and they are built rather than promised: a canvas inside a classroom is never handed to a stranger by the relay and never appears in the gallery or on the world map. Getting in takes a six-character code read out by whoever is running the class. There are still no accounts for children — no email, no name, no password — because a mark and a code is the whole of what a classroom needs.',
+        'A school using the *public* canvases should still treat them as a public space, because they are one. The code is the difference.',
       ],
     },
     {
       heading: 'Why the design is the safeguarding',
       paragraphs: [
         'There is no chat, no comments, no direct messages and no text tool. There is no way to write a word to another person here, which means there is no grooming surface — the drawing is the only channel, and it is public, permanent and attributable to a mark.',
-        'There are no avatars, no profiles with anything personal on them, and no way to state or discover where anybody is.',
+        'There are no avatars, and a profile is a page of drawings and nothing else — no bio, no follower count, no way to send anything to the person it belongs to.',
+        'There is no way to state or discover where anybody is. A finished canvas can carry a city, chosen from a list by whoever opened it; it says where a picture happened, never where a person is, and it is the canvas that carries it.',
         'Nobody can remove or deface what a child draws. Additive-only is enforced in the database, not by convention.',
         'None of this is a side effect. Each absence is load-bearing, and each one is listed under “Never” in the roadmap for that reason.',
       ],
