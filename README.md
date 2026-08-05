@@ -374,11 +374,31 @@ submitting a drawing, which is the one operation here that must not fail for an
 unrelated reason. Until the worker is deployed the queue simply fills, and the
 moment it runs everyone gets the one notification that is still true.
 
-**Not deployed.** `supabase/functions/notify/` needs VAPID keys and a
-`NOTIFY_SECRET`, and `VITE_VAPID_PUBLIC_KEY` has to reach the client build.
-Without them `pushSupported()` is false and the toggle says so rather than
-failing at the moment somebody taps. The header of that file has the exact
-commands.
+**Turning it on** is one command:
+
+```bash
+scripts/setup-notify.sh            # generate, deploy, prove, schedule
+scripts/setup-notify.sh --status   # what it is doing
+scripts/setup-notify.sh --off      # stop sending, keep the queue
+```
+
+It generates the VAPID keypair and the shared secret rather than asking for
+them, stores them as function secrets, deploys the sender, and then **proves
+the endpoint answers with the secret and 404s without it before it schedules
+anything.** Refusing to schedule an endpoint anybody can poke is the same
+lesson as the off-site backup: a wrong value stored without checking does not
+announce itself until the first canvas closes, in a job nobody is watching.
+
+The schedule is a function (`schedule_notify`) rather than a `cron.schedule`
+written into a migration, because scheduling it needs the project URL and the
+shared secret and neither belongs in this repository. The migration carries the
+mechanism; the secret lives in the cron row and the function's environment and
+nowhere else.
+
+One step is deliberately left to a human, because it is a deploy: the client
+needs `VITE_VAPID_PUBLIC_KEY` in Vercel before a browser can subscribe at all.
+The script prints it. Until it is set, `/mark` says the build has no push
+behind it, which is true and better than a button that fails when tapped.
 
 ## Hands, gifts and rooms
 
