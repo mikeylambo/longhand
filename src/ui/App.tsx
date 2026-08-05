@@ -7,8 +7,18 @@ import { SignaturePad } from './SignaturePad'
 import { DrawTurn } from './DrawTurn'
 import { Review } from './Review'
 import { Welcome, markWelcomed, seenWelcome } from './Welcome'
+import { Invitation } from './Invitation'
+import { peekGift, type GiftPeek } from '../data/ledger'
+import { LEDGER_ENABLED } from '../lib/supabase'
 
-type Phase = 'loading' | 'welcome' | 'signature' | 'draw' | 'review' | 'error'
+type Phase =
+  | 'loading'
+  | 'welcome'
+  | 'invited'
+  | 'signature'
+  | 'draw'
+  | 'review'
+  | 'error'
 
 const message = (e: unknown) =>
   e instanceof Error ? e.message : 'something went wrong'
@@ -34,8 +44,9 @@ function transition(update: () => void): void {
   d.startViewTransition(() => flushSync(update))
 }
 
-export function App() {
+export function App({ giftToken }: { giftToken?: string } = {}) {
   const [session] = useState(createSession)
+  const [gift, setGift] = useState<GiftPeek | null>(null)
   const [phase, setPhase] = useState<Phase>('loading')
   const [error, setError] = useState<string | null>(null)
   const [canvas, setCanvas] = useState<CanvasState | null>(null)
@@ -76,9 +87,43 @@ export function App() {
     [session],
   )
 
+  /** Taking the place somebody saved, which is a different act from being
+   *  assigned one and should never quietly become one. */
+  const accept = useCallback(async () => {
+    setPhase('loading')
+    setError(null)
+    try {
+      const joined = await session.redeemGift(giftToken!)
+      transition(() => {
+        setJustDrawn([])
+        setCanvas(joined)
+        setPhase('draw')
+      })
+    } catch (e) {
+      setError(message(e))
+      setPhase('error')
+    }
+  }, [session, giftToken])
+
   const boot = useCallback(async () => {
     setPhase('loading')
     setError(null)
+
+    // An invitation names a canvas, so it is answered before anything else —
+    // including the welcome screen, which would otherwise talk about taking
+    // whatever slot is going to somebody who has been offered a particular one.
+    if (giftToken && LEDGER_ENABLED) {
+      const peek = await peekGift(giftToken)
+      setGift(peek)
+      if (peek && !peek.taken && !peek.expired) {
+        markWelcomed()
+        setPhase('invited')
+        return
+      }
+      // A spent or expired invitation is not an error to shout about: the
+      // canvas is still there and there are other places on it.
+    }
+
     // A returning hand goes straight to a sheet. The welcome screen is for
     // somebody who has never seen this, and seeing it twice would be a lecture.
     if (!session.hasSignature()) {
@@ -86,7 +131,7 @@ export function App() {
       return
     }
     await take()
-  }, [session, take])
+  }, [session, take, giftToken])
 
   useEffect(() => {
     void boot()
@@ -114,6 +159,19 @@ export function App() {
     )
   }
 
+  if (phase === 'invited' && gift) {
+    return (
+      <Invitation
+        gift={gift}
+        hasMark={session.hasSignature()}
+        onAccept={() => {
+          if (session.hasSignature()) void accept()
+          else transition(() => setPhase('signature'))
+        }}
+      />
+    )
+  }
+
   if (phase === 'welcome') {
     return (
       <Welcome
@@ -133,7 +191,10 @@ export function App() {
           try {
             await session.registerSignature(strokes)
             setSignature(loadSignature())
-            await take()
+            // Signing on the way in from an invitation lands on the place that
+            // was saved, not on whatever the relay would have handed out.
+            if (giftToken && gift && !gift.taken && !gift.expired) await accept()
+            else await take()
           } catch (e) {
             setError(message(e))
             setPhase('error')

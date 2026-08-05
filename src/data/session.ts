@@ -16,8 +16,11 @@ import {
   fetchCanvas,
   fetchLayers,
   inheritedPalette,
+  redeemGiftToken,
   releaseTurn,
   submitTurn,
+  type CanvasRow,
+  type TurnRow,
 } from './ledger'
 
 export interface CanvasState {
@@ -53,6 +56,8 @@ export interface Session {
   /** `slots` asks for a format. Left off, the ledger sends you to whatever is
    *  closest to closing. */
   join(slots?: number): Promise<CanvasState>
+  /** Takes the place somebody saved for you, rather than whatever is going. */
+  redeemGift(token: string): Promise<CanvasState>
   submit(layer: Stroke[]): Promise<CanvasState>
   nextCanvas(slots?: number): Promise<CanvasState>
   /** Hands the slot back rather than making the canvas wait out the clock. */
@@ -102,6 +107,12 @@ class LocalSession implements Session {
     this.layers = []
     this.slotCount = slots ?? SLOTS_PER_CANVAS
     return this.join()
+  }
+
+  async redeemGift(): Promise<CanvasState> {
+    // There is nobody to have been invited by: local mode is one browser
+    // pretending to be a relay.
+    throw new Error('invitations need the ledger, and this build has none')
   }
 
   async abandon(): Promise<void> {
@@ -154,7 +165,12 @@ class LedgerSession implements Session {
 
     const { turn, canvas } = await claimTurn(signatureId, slots)
     this.turnId = turn.id
+    return this.stateFor(turn, canvas)
+  }
 
+  /** One shape for a live turn, however it was come by — claimed from the
+   *  relay or handed over by somebody. */
+  private async stateFor(turn: TurnRow, canvas: CanvasRow): Promise<CanvasState> {
     const layers = await fetchLayers(canvas.id)
     return {
       canvasId: canvas.id,
@@ -210,6 +226,14 @@ class LedgerSession implements Session {
   async nextCanvas(slots?: number): Promise<CanvasState> {
     this.turnId = null
     return this.join(slots)
+  }
+
+  async redeemGift(token: string): Promise<CanvasState> {
+    const signatureId = cachedSignatureId()
+    if (!signatureId) throw new Error('no signature registered for this browser')
+    const { turn, canvas } = await redeemGiftToken(token)
+    this.turnId = turn.id
+    return this.stateFor(turn, canvas)
   }
 
   async abandon(): Promise<void> {
