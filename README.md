@@ -3,10 +3,13 @@
 *A museum the world fills in, one stranger at a time.*
 
 Milestones 1–4 of the v1 brief — **the surface**, **the ledger**, **the loop**
-and **the close** — plus **Phase A**, which is everything that has to exist
-before a stranger sees it. Distinct hands claim slots on a shared sheet, each on
-a ten-minute clock, and when the last one submits the canvas locks forever and
-gets its own page. Two hands, four, or twelve. No accounts.
+and **the close** — plus **Phase A** (everything that has to exist before a
+stranger sees it), **Phase B** (feature-complete) and **Phase C** (the museum).
+
+Distinct hands claim slots on a shared sheet, each on a ten-minute clock, and
+when the last one submits the canvas locks forever and gets its own page. Two
+hands, four, twelve, a classroom of twenty-four or a marathon of a hundred. No
+accounts.
 
 ```bash
 npm install
@@ -122,6 +125,29 @@ canvas. See *Moderation* below.
 
 **Terms and a position on young people**, at `/terms` and `/safety`, written
 before the first stranger drew rather than after.
+
+## What Phase B and Phase C added
+
+The roadmap gates Phase B on the twelve-stranger test and Phase C on
+retention, so that each tool answers an observed failure rather than a guessed
+one. Both gates were skipped deliberately, by decision, and the consequence is
+worth writing down: **every branch of B2 is built rather than the one the gate
+would have chosen.** Nothing here has met a stranger.
+
+| | |
+|---|---|
+| B1 | A mark that survives a cleared browser, and notifications when a canvas moves or closes |
+| B2 | Stamps, bounded fill, translucent wash, texture pens |
+| B3 | A page per hand — every canvas it has been on, and what you have shared with it |
+| B4 | Gifted slots: one held place, for one person |
+| B5 | Seeds that change without a deploy, and guest artists opening a canvas |
+| B6 | Classroom (24) and marathon (100) formats |
+| C1 | The world map: finished canvases pinned where they closed |
+| C2 | `/screen` — the gallery as a wall |
+| C3 | Prints, gated on every contributor's consent. **No payment processor is wired.** |
+| C4 | Cosmetic ink sets, enforced cosmetic in the schema. **No payment processor is wired.** |
+| C5 | Classrooms: private canvases, a code read off a whiteboard, no accounts for children |
+| C6 | `/ar/<id>` — viewing a finished canvas in the room. Viewing only, forever |
 
 ## Formats
 
@@ -268,6 +294,153 @@ under *Never* in the roadmap for exactly this reason.
 
 **This has not been through a lawyer.** It should be before anything is sold,
 which is the moment the print line in Phase C arrives.
+
+## The tools
+
+Five of them, and the constraint they were chosen against is the reason they
+were cheap: **every one produces ordinary `Stroke` rows in the format the
+ledger has stored since milestone 2.** A tool that needed a new kind of row
+would need a new renderer, a new codec path, a new video path and a new print
+path, and would divide the archive into things that replay and things that used
+to.
+
+**Stamps** — birds, leaves, a window, a boat. The biggest inclusivity lever in
+the product: somebody who says they cannot draw still puts down something that
+reads as intentional. Priced at their own outline length, so a stamp is never
+cheaper than drawing the same thing by hand, and rotated slightly by where they
+land so a row of them reads as placed rather than tiled.
+
+**Texture pens** — hatch, stipple, halftone. Depth without skill. Marks are
+spaced by distance travelled rather than by pointer events, so a slow drag and
+a fast one lay down the same density; otherwise the tool rewards moving your
+finger slowly, which is not a skill.
+
+**Translucent wash** — multiplies over what is beneath at a fixed low alpha.
+This is the one that needed guarding. A multiply never removes a pixel, which
+is what makes it additive, and a dark enough one repeated over somebody's work
+leaves a rectangle where their drawing was — which is removal by another name.
+So a wash is restricted to the lighter half of the range, checked in
+`wash_colour_allowed()` server-side and greyed out in the palette client-side,
+and the UI switches you off ink the moment you pick it up.
+
+**Bounded fill** — colour inside what a previous player outlined. The purest
+response act available: it cannot be done alone, it cannot be done first, and
+what it produces depends entirely on what the people before you left.
+
+The fill is stored as **a polygon, not a seed point.** Flooding the region and
+keeping the tap position would be a tenth of the bytes and completely wrong:
+two browsers antialias a curve differently by one pixel, the flood escapes
+through that pixel on one of them, and the archive stops being the same picture
+everywhere it is opened. So the region is flooded once, on the phone that
+tapped, its boundary traced with Moore-neighbour tracing, simplified with
+Douglas–Peucker, and stored as geometry. A polygon is a fact.
+
+It refuses to escape. A tap that reaches the edge of the sheet, or covers more
+than a third of it, is refused out loud rather than filled — through a gap in
+an unclosed outline it would otherwise cover everybody. `tests/tools.spec.ts`
+asserts both halves of that, and asserts the same tap traces identically twice.
+
+**What the ink floor is for.** `layer_ink()` measures travelled distance, which
+is right for a line and wrong for a dot: a stipple mark has no length, so six
+hundred of them used to cost nothing and the ink budget — the only thing that
+makes a turn finite — stopped applying. Migration 0027 charges a floor of 18 per
+mark, the same number the client charges, so neither has to trust the other.
+
+## The return hook
+
+The largest structural gap in the product until now: somebody drew, submitted,
+and nothing ever told them the canvas finished.
+
+**A mark is now held by a set of browsers, not one.** The device key was a
+bearer token in local storage — clearing it lost your mark, copying it took
+your mark — which was an honest trade while nothing was ever *sent* to anybody.
+It stops being one the moment a notification says a canvas you drew on has
+closed, because "you" then has to survive a browser update.
+
+So there is a **recovery key**: minted by the server, shown once, stored only
+as a digest, and good for as many browsers as you like. It is the one
+credential this product has. It identifies nobody, it cannot be reset because
+there is no email to reset it with, and losing it costs exactly what losing the
+device key cost before.
+
+**Two notifications and no others.** Somebody added to a canvas you are on, and
+a canvas you are on finished. No digests, no reminders, no "it has been a
+while". The hand that closes a canvas does not also get told somebody drew on
+it — two pushes about one event is how an app gets muted.
+
+The queue is a table and the sender is a worker, deliberately. A trigger that
+made an HTTP call would put a push service on the critical path of somebody
+submitting a drawing, which is the one operation here that must not fail for an
+unrelated reason. Until the worker is deployed the queue simply fills, and the
+moment it runs everyone gets the one notification that is still true.
+
+**Not deployed.** `supabase/functions/notify/` needs VAPID keys and a
+`NOTIFY_SECRET`, and `VITE_VAPID_PUBLIC_KEY` has to reach the client build.
+Without them `pushSupported()` is false and the toggle says so rather than
+failing at the moment somebody taps. The header of that file has the exact
+commands.
+
+## Hands, gifts and rooms
+
+**A hand's page** (`/h/<signature>`) is the identity system taken to its
+conclusion: the signature *is* the account, so a page of work is the whole of a
+profile. No bio, no follower count, no way to send anything. The one thing it
+says about a relationship is *you have shared four canvases with this hand*,
+which is a set intersection and needs no follow button — and the moment there
+is one, this stops being a museum.
+
+**A gifted slot** is the generous version of the share instinct. On a canvas
+you have drawn on, you may hold one place for one person: a link, three days,
+and the canvas genuinely waits. You cannot broadcast it, there is no counter of
+how many you have given, and giving gains you nothing. The relay respects the
+hold — `slot_is_free()` is the one question every claim path asks — so a
+stranger is never handed a slot somebody just promised to a friend.
+
+**Classrooms** are the one place the product behaves differently, because a
+public canvas that strangers draw on is not something a teacher can supervise.
+A classroom canvas is never handed out by the relay and never appears in the
+gallery or on the map; getting in takes a six-character code read off a
+whiteboard. There are still no accounts for children — a mark and a code is the
+whole of it, which is what makes it usable in a school rather than a
+procurement exercise.
+
+## The museum
+
+**The world map** (`/world`) pins finished canvases where they closed — the
+deliberate inversion of a territorial pixel board, which is a map of where your
+work is about to be painted over. A pin is a *city*, chosen from a list by the
+hand that opened the canvas. Nothing in this product asks a browser where it
+is, and there is no location permission prompt anywhere, because a canvas has a
+place and a person never does.
+
+The map is an SVG equirectangular projection, which is unfashionable and
+exactly right: a few hundred bytes, no tile server, no API key, no third party
+watching who looks at what, and it renders identically offline.
+
+**The wall** (`/screen`) is the gallery with no chrome, no controls and no
+cursor, cycling finished canvases with the wake lock held. A browser in kiosk
+mode on a television is what makes "museum" literal, and it cost almost nothing
+because the whole thing was already a web page.
+
+**In the room** (`/ar/<id>`) stands a finished canvas up in front of you.
+Viewing only, permanently — drawing in three dimensions does not composite into
+a shared flat piece, so it would be a different medium wearing this game's
+name. WebXR where it exists; everywhere else the sheet leans with the phone,
+which is not AR but is the same gesture and is better than a page saying your
+browser is not supported.
+
+**Prints and ink sets are built and unwired.** Both are where money could enter
+this product and both are where it is most likely to ruin it, so the constraints
+are in the schema rather than in a policy document. An ink set is a selection
+from colours that are *already* legal — a trigger refuses one containing
+anything else, because the day somebody wants to sell an advantage the schema
+has to be the thing that says no. A print asks every contributor and is only
+made when all of them have said yes; one no ends it. Neither `price_pence` nor
+`paid_at` is read or written by anything: **wiring them needs a Stripe account
+and a print vendor, which is not something code in this repository can
+conjure.** Until then a set can be granted by hand and a print request is a
+queue an operator reads, which is genuinely how the first ones should be
+filled.
 
 ## Hand feel
 
@@ -817,6 +990,7 @@ right failure, but it fails a run that is meant to need nothing but a browser.
 | `colour` | a browser | the client's eighty colours against a copy of the migration |
 | `onboarding` | a browser | the first visit, which is otherwise invisible once seen |
 | `ledger` | a database | the ink budget and the palette, against the real endpoint |
+| `tools` | a browser | a fill stays inside a shape, refuses to escape one, and traces the same way twice |
 | `formats` | a database | duos close; the moderation levers are unreachable by clients |
 
 ## Known gaps
@@ -922,7 +1096,7 @@ worth something first.
 
 ## Before this goes in front of strangers
 
-Phase A is built. What is left is not code:
+Everything on the roadmap is built. What is left is not code:
 
 1. **Seed the production database with the format rotation in place**, or let it
    fill naturally. Existing canvases are all twelves and stay that way; the
@@ -936,4 +1110,16 @@ Phase A is built. What is left is not code:
    you want to send one to someone.
 4. **Close the phone half of `docs/friction.md`.** Hand feel is the one thing no
    agent can judge, and that list names exactly which questions are waiting for
-   a real device.
+   a real device. The tools add to it: whether a stamp lands where a thumb
+   expects, whether a wash reads as a wash on a phone screen in daylight, and
+   whether the fill's refusal message arrives fast enough to feel like an
+   answer rather than a failure.
+5. **Decide what to turn off.** Every branch of B2 shipped because the gate was
+   skipped, which is more tools than the gate would have chosen. If the first
+   canvases come back as noise, the answer is to set a tool's chip aside rather
+   than to tune it — the tray is one array in `DrawTurn.tsx`.
+
+Two things need accounts nobody here can open: **VAPID keys** before any
+notification sends, and **a payment processor and a print vendor** before a
+print or an ink set can be sold. Both are built up to exactly that line and
+stop there.

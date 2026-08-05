@@ -7,6 +7,7 @@ import type { StoredSignature } from '../store'
 import type { CanvasState } from '../data/session'
 import { Replay } from './Replay'
 import { Footer } from './Footer'
+import { AfterTurn } from './AfterTurn'
 
 interface Props {
   canvas: CanvasState
@@ -119,9 +120,14 @@ export function Review({ canvas, layer, signature, mode, onNext }: Props) {
         </div>
         {!canvas.closed && canvas.canvasId && (
           <p className="stat">
-            That page is where it will be when the last hand lands. Keep the
-            link — there is nothing else that will tell you.
+            That page is where it will be when the last hand lands. Turn
+            notifications on from <a href="/mark">your mark</a> and you will be
+            told instead of having to remember.
           </p>
+        )}
+
+        {mode === 'ledger' && canvas.canvasId && !canvas.closed && (
+          <AfterTurn canvasId={canvas.canvasId} slot={slot} />
         )}
       </div>
 

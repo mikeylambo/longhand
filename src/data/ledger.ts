@@ -312,6 +312,190 @@ export async function fetchClosedCanvases(limit = 40): Promise<CanvasRow[]> {
   return (data ?? []) as CanvasRow[]
 }
 
+export interface GiftPeek {
+  seed: string
+  slot: number
+  slot_count: number
+  canvas: string
+  expires_at: string
+  taken: boolean
+  expired: boolean
+}
+
+/** What an invitation says before anybody has signed anything. Never who sent
+ *  it — a gift is between two people and the ledger is not one of them. */
+export async function peekGift(token: string): Promise<GiftPeek | null> {
+  const db = requireSupabase()
+  const { data, error } = await db.rpc('peek_gift', { p_token: token })
+  if (error || !data) return null
+  return data as GiftPeek
+}
+
+export async function giftSlot(canvasId: string): Promise<{ token: string; slot: number }> {
+  const signatureId = cachedSignatureId()
+  if (!signatureId) throw new Error('no signature registered for this browser')
+  const db = requireSupabase()
+  const { data, error } = await db.rpc('gift_slot', {
+    p_canvas: canvasId,
+    p_signature: signatureId,
+    p_device_key: deviceKey(),
+  })
+  if (error) throw new Error(`could not save a place: ${error.message}`)
+  return data as { token: string; slot: number }
+}
+
+export async function redeemGiftToken(token: string): Promise<ClaimResult> {
+  const signatureId = cachedSignatureId()
+  if (!signatureId) throw new Error('no signature registered for this browser')
+  const db = requireSupabase()
+  const { data, error } = await db.rpc('redeem_gift', {
+    p_token: token,
+    p_signature: signatureId,
+    p_device_key: deviceKey(),
+  })
+  if (error) throw new Error(`that place is not there: ${error.message}`)
+  return data as ClaimResult
+}
+
+export interface Place {
+  id: string
+  name: string
+  country: string
+  lat: number
+  lon: number
+}
+
+export interface PinnedCanvas {
+  canvas: CanvasRow
+  place: Place
+}
+
+export async function fetchPlaces(): Promise<Place[]> {
+  const db = requireSupabase()
+  const { data, error } = await db
+    .from('places')
+    .select('id, name, country, lat, lon')
+    .order('name', { ascending: true })
+  if (error) return []
+  return (data ?? []) as Place[]
+}
+
+/**
+ * Finished canvases that have a place, for the world map.
+ *
+ * Unlisted and classroom canvases are excluded by the same rule the gallery
+ * uses, because a map is a shelf with geography on it and a canvas taken off
+ * one shelf is off both.
+ */
+export async function fetchPinnedCanvases(limit = 300): Promise<PinnedCanvas[]> {
+  const db = requireSupabase()
+  const { data, error } = await db
+    .from('canvases')
+    .select('*, places(id, name, country, lat, lon)')
+    .eq('status', 'closed')
+    .eq('listed', true)
+    .is('classroom_id', null)
+    .not('place_id', 'is', null)
+    .order('closed_at', { ascending: false })
+    .limit(limit)
+  if (error) throw new Error(`could not load the map: ${error.message}`)
+
+  return ((data ?? []) as unknown as (CanvasRow & { places: Place | null })[])
+    .filter((row) => row.places)
+    .map((row) => ({ canvas: row, place: row.places! }))
+}
+
+/** Names where a canvas is, once, by the hand that opened it. */
+export async function setCanvasPlace(
+  canvasId: string,
+  placeId: string,
+): Promise<void> {
+  const signatureId = cachedSignatureId()
+  if (!signatureId) throw new Error('no signature registered for this browser')
+  const db = requireSupabase()
+  const { error } = await db.rpc('set_canvas_place', {
+    p_canvas: canvasId,
+    p_place: placeId,
+    p_signature: signatureId,
+    p_device_key: deviceKey(),
+  })
+  if (error) throw new Error(`could not pin that canvas: ${error.message}`)
+}
+
+/** One canvas a hand appears on, with that hand's layer from it. */
+export interface HandCanvas {
+  layerId: string
+  slotIndex: number
+  strokes: Stroke[]
+  submittedAt: string
+  canvas: CanvasRow
+}
+
+/**
+ * Every canvas a signature appears on.
+ *
+ * The identity system taken to its conclusion: the signature *is* the account,
+ * so this is the whole of a profile. No bio, no follower count, no way to
+ * message — a page of work and nothing else, which is the only kind of profile
+ * that fits a product whose only channel is the drawing.
+ *
+ * Needs no new grant. `layers` and `canvases` are already readable, and RLS
+ * still hides what has been hidden — so a hand's page and the canvas pages
+ * agree about what exists without either of them being told to.
+ */
+export async function fetchHandCanvases(
+  signatureId: string,
+  limit = 60,
+): Promise<HandCanvas[]> {
+  const db = requireSupabase()
+  const { data, error } = await db
+    .from('layers')
+    .select('id, slot_index, strokes, submitted_at, canvases(*)')
+    .eq('signature_id', signatureId)
+    .order('submitted_at', { ascending: false })
+    .limit(limit)
+  if (error) throw new Error(`could not load that hand: ${error.message}`)
+
+  return ((data ?? []) as unknown as (LayerRow & { canvases: CanvasRow })[])
+    .filter((r) => r.canvases)
+    .map((r) => ({
+      layerId: r.id,
+      slotIndex: r.slot_index,
+      strokes: decodeLayer(r.strokes),
+      submittedAt: r.submitted_at,
+      canvas: r.canvases,
+    }))
+}
+
+/**
+ * Which canvases two hands have both been on.
+ *
+ * The most emotionally distinctive thing available here, and it is a set
+ * intersection. Quiet regulars emerge out of strangers without anybody
+ * following anybody — there is no follow button to add, and adding one would
+ * turn a museum into a network.
+ */
+export async function sharedCanvasIds(
+  a: string,
+  b: string,
+): Promise<string[]> {
+  if (a === b) return []
+  const db = requireSupabase()
+  const { data, error } = await db
+    .from('layers')
+    .select('canvas_id, signature_id')
+    .in('signature_id', [a, b])
+  if (error) return []
+
+  const rows = (data ?? []) as { canvas_id: string; signature_id: string }[]
+  const mine = new Set(rows.filter((r) => r.signature_id === a).map((r) => r.canvas_id))
+  return [
+    ...new Set(
+      rows.filter((r) => r.signature_id === b && mine.has(r.canvas_id)).map((r) => r.canvas_id),
+    ),
+  ]
+}
+
 /**
  * Palette inheritance: every colour already on the canvas, plus two more from
  * the master palette. Slot 1 gets a free hand. This is the highest-leverage
@@ -348,3 +532,128 @@ export function inheritedPalette(
 
 export const isCanvasFull = (c: CanvasRow) =>
   c.slots_filled >= (c.slot_count ?? SLOTS_PER_CANVAS)
+
+// ------------------------------------------------------------------- prints
+
+export interface PrintQuestion {
+  request: string
+  canvas: string
+  seed: string
+  state: 'consent' | 'ready'
+  answered: 'yes' | 'no' | null
+}
+
+/**
+ * Asking for a print asks everybody else too.
+ *
+ * The terms say a contributor can decline to be in something sold, so consent
+ * is the mechanism rather than a policy: nothing is made until every hand on
+ * the canvas has said yes, and one no ends it.
+ */
+export async function requestPrint(canvasId: string): Promise<void> {
+  const signatureId = cachedSignatureId()
+  if (!signatureId) throw new Error('no signature registered for this browser')
+  const db = requireSupabase()
+  const { error } = await db.rpc('request_print', {
+    p_canvas: canvasId,
+    p_signature: signatureId,
+    p_device_key: deviceKey(),
+  })
+  if (error) throw new Error(`could not ask about a print: ${error.message}`)
+}
+
+export async function myPrintQuestions(): Promise<PrintQuestion[]> {
+  const signatureId = cachedSignatureId()
+  if (!signatureId) return []
+  const db = requireSupabase()
+  const { data, error } = await db.rpc('my_print_questions', {
+    p_signature: signatureId,
+    p_device_key: deviceKey(),
+  })
+  if (error) return []
+  return (data ?? []) as PrintQuestion[]
+}
+
+export async function answerPrint(requestId: string, yes: boolean): Promise<string> {
+  const signatureId = cachedSignatureId()
+  if (!signatureId) throw new Error('no signature registered for this browser')
+  const db = requireSupabase()
+  const { data, error } = await db.rpc('answer_print', {
+    p_request: requestId,
+    p_signature: signatureId,
+    p_device_key: deviceKey(),
+    p_yes: yes,
+  })
+  if (error) throw new Error(`that answer did not save: ${error.message}`)
+  return data as string
+}
+
+// --------------------------------------------------------------- classrooms
+
+export interface Classroom {
+  id: string
+  name: string
+  code: string
+  canvases: {
+    id: string
+    seed: string
+    status: string
+    slots: number
+    filled: number
+  }[]
+}
+
+export async function openClassroom(name: string): Promise<Classroom> {
+  const signatureId = cachedSignatureId()
+  if (!signatureId) throw new Error('you need a mark before you can open a room')
+  const db = requireSupabase()
+  const { data, error } = await db.rpc('open_classroom', {
+    p_name: name,
+    p_signature: signatureId,
+    p_device_key: deviceKey(),
+  })
+  if (error) throw new Error(`could not open a room: ${error.message}`)
+  return { ...(data as Classroom), canvases: [] }
+}
+
+export async function myClassrooms(): Promise<Classroom[]> {
+  const signatureId = cachedSignatureId()
+  if (!signatureId) return []
+  const db = requireSupabase()
+  const { data, error } = await db.rpc('my_classrooms', {
+    p_signature: signatureId,
+    p_device_key: deviceKey(),
+  })
+  if (error) return []
+  return (data ?? []) as Classroom[]
+}
+
+export async function openClassroomCanvas(
+  code: string,
+  slots: number,
+): Promise<{ id: string }> {
+  const signatureId = cachedSignatureId()
+  if (!signatureId) throw new Error('you need a mark first')
+  const db = requireSupabase()
+  const { data, error } = await db.rpc('open_classroom_canvas', {
+    p_code: code,
+    p_signature: signatureId,
+    p_device_key: deviceKey(),
+    p_slots: slots,
+  })
+  if (error) throw new Error(`could not start that canvas: ${error.message}`)
+  return data as { id: string }
+}
+
+export async function claimClassroomTurn(code: string): Promise<ClaimResult> {
+  const signatureId = cachedSignatureId()
+  if (!signatureId) throw new Error('you need a mark before you can join')
+  const db = requireSupabase()
+  const { data, error } = await db.rpc('claim_classroom_turn', {
+    p_code: code,
+    p_signature: signatureId,
+    p_device_key: deviceKey(),
+  })
+  if (error) throw new Error(`could not join that class: ${error.message}`)
+  return data as ClaimResult
+}

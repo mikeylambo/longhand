@@ -6,6 +6,7 @@ import { LEDGER_ENABLED } from '../lib/supabase'
 import { Replay } from './Replay'
 import { renderTimelapseVideo, videoExportSupported } from '../engine/video'
 import { ReportButton } from './ReportButton'
+import { cachedSignatureId, requestPrint } from '../data/ledger'
 import { Footer } from './Footer'
 
 interface Props {
@@ -48,6 +49,8 @@ export function CanvasPage({ canvasId }: Props) {
   const [copied, setCopied] = useState(false)
   const [videoProgress, setVideoProgress] = useState<number | null>(null)
   const [videoError, setVideoError] = useState<string | null>(null)
+  const [printState, setPrintState] = useState<'idle' | 'asking' | 'asked'>('idle')
+  const [printError, setPrintError] = useState<string | null>(null)
 
   const saveTimelapse = async (loaded: Loaded) => {
     setVideoError(null)
@@ -222,6 +225,43 @@ export function CanvasPage({ canvasId }: Props) {
               </div>
             ))}
           </div>
+        )}
+
+        {state.closed && cachedSignatureId() && (
+          <>
+            <div className="review-caption">On paper</div>
+            <p className="stat">
+              A print carries every signature on the back. Asking asks everybody
+              who drew on it as well — nothing is made unless all of them say
+              yes, which is what the terms promise and this is how it is kept.
+            </p>
+            <div className="row">
+              <button
+                className="linkbtn"
+                disabled={printState !== 'idle'}
+                onClick={async () => {
+                  setPrintState('asking')
+                  try {
+                    await requestPrint(canvasId)
+                    setPrintState('asked')
+                  } catch (e) {
+                    setPrintError(e instanceof Error ? e.message : String(e))
+                    setPrintState('idle')
+                  }
+                }}
+              >
+                {printState === 'asked'
+                  ? 'Everybody has been asked'
+                  : printState === 'asking'
+                    ? 'Asking…'
+                    : 'Ask about a print'}
+              </button>
+              <a className="linkbtn quiet" href={`/ar/${canvasId}`}>
+                See it in the room
+              </a>
+            </div>
+            {printError && <p className="stat error">{printError}</p>}
+          </>
         )}
 
         <div className="review-caption">Something wrong with it?</div>

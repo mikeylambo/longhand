@@ -13,8 +13,12 @@ export function Footer({ gallery = false }: { gallery?: boolean }) {
         <>
           <a href="/gallery">The gallery</a>
           <span aria-hidden="true">·</span>
+          <a href="/world">The world</a>
+          <span aria-hidden="true">·</span>
         </>
       )}
+      <a href="/mark">Your mark</a>
+      <span aria-hidden="true">·</span>
       <a href="/terms">Terms</a>
       <span aria-hidden="true">·</span>
       <a href="/safety">Safety</a>
