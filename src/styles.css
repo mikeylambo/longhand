@@ -533,6 +533,9 @@ button {
   flex: 1;
   min-height: 0;
   -webkit-overflow-scrolling: touch;
+  /* Otherwise the last line stops flush against the action row and reads as
+     cut off rather than as scrolled to the end. */
+  padding-bottom: 10px;
 }
 
 .stat {
@@ -545,6 +548,172 @@ button {
 .panel.center {
   justify-content: center;
   align-items: flex-start;
+}
+
+/* A second, quieter voice for anything that isn't the thing being asked for:
+   downloads, reports, the layer JSON. Same shape as a link button so the
+   hierarchy is weight rather than a different kind of control. */
+.linkbtn.quiet {
+  border-color: transparent;
+  color: var(--muted);
+}
+
+/* Format, stated once next to the seed. Not a badge and not a count — the
+   gallery must never start reading as a scoreboard. */
+.chip {
+  font-family: var(--sans);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+  padding: 3px 8px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.footer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.footer a {
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+
+.footer a:hover {
+  border-bottom-color: var(--rule);
+}
+
+/* ---------------------------------------------------------------- welcome */
+
+/* The clip leads, so it sits above the heading and goes edge to edge of the
+   panel. Cropped square-ish rather than shown whole: the top of the sheet is
+   sky, and a first impression should open on the part with something in it. */
+.reel {
+  margin: 0 -22px 18px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+  overflow: hidden;
+  max-height: 46vh;
+  display: flex;
+  justify-content: center;
+}
+
+.reel canvas {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+@media (min-width: 620px) {
+  .reel {
+    margin-left: 0;
+    margin-right: 0;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+  }
+}
+
+/* Three promises, not three features. A definition list because that is what
+   they are: a word, and what it means here. */
+.promises {
+  margin: 0 0 4px;
+  max-width: 42ch;
+}
+
+.promises dt {
+  font-family: var(--serif);
+  font-size: 15px;
+  margin-top: 12px;
+}
+
+.promises dd {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+/* The format choice on the review screen. Text, not buttons: taking whatever
+   is closest to closing is the right answer for almost everybody, and this
+   should read as an aside rather than as a decision being demanded. */
+.chooser {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.asif {
+  color: var(--ink);
+  border-bottom: 1px solid var(--rule);
+  padding: 2px 0;
+}
+
+/* -------------------------------------------------------------- reporting */
+
+/* Bottom-right of the sheet, out of the way of both thumbs and the tools.
+   Deliberately small: it has to be findable when it is needed and invisible
+   when it is not. */
+.report-corner {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 2;
+  background: rgba(231, 224, 210, 0.85);
+  border-radius: 999px;
+}
+
+.card-report {
+  margin-top: 2px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.card-report .linkbtn {
+  padding: 2px 6px;
+  font-size: 10px;
+}
+
+/* A slot nobody has taken yet. The gap is the point — a canvas mid-fill should
+   look like it is waiting for somebody, not like it is broken. */
+.card.waiting .card-placeholder {
+  border-style: dashed;
+  background: transparent;
+}
+
+.card.waiting figcaption {
+  opacity: 0.55;
+}
+
+/* ------------------------------------------------------------------- docs */
+
+.doc section {
+  margin-bottom: 22px;
+}
+
+.doc h2 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 19px;
+  margin: 0 0 8px;
+}
+
+.doc p {
+  margin: 0 0 10px;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 46ch;
 }
 
 /* ----------------------------------------------------------------- replay */
