@@ -28,6 +28,55 @@ self.addEventListener('activate', (event) => {
   )
 })
 
+/**
+ * Push.
+ *
+ * Two events are worth waking somebody for and no others: a hand landed on a
+ * canvas you are part of, and a canvas you are part of finished. The payload
+ * carries its own text because the service worker must not have to fetch
+ * anything to render a notification — a push that arrives on a bad connection
+ * and then says nothing is worse than no push.
+ *
+ * `tag` is the canvas id, so a second notification about the same canvas
+ * replaces the first rather than stacking. Somebody who has been away for a
+ * week should come back to one line about each canvas, not forty.
+ */
+self.addEventListener('push', (event) => {
+  let payload = {}
+  try {
+    payload = event.data ? event.data.json() : {}
+  } catch {
+    /* a push with no readable body still gets shown, quietly */
+  }
+  const title = payload.title || 'Longhand'
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: payload.body || '',
+      tag: payload.tag || 'longhand',
+      renotify: false,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      data: { url: payload.url || '/' },
+    }),
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const url = (event.notification.data && event.notification.data.url) || '/'
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+      // Focus a tab that is already on that canvas rather than opening a
+      // second one. Somebody tapping a notification wants the thing, not
+      // another copy of the app.
+      for (const win of wins) {
+        if (win.url.endsWith(url) && 'focus' in win) return win.focus()
+      }
+      return clients.openWindow(url)
+    }),
+  )
+})
+
 self.addEventListener('fetch', (event) => {
   const { request } = event
   if (request.method !== 'GET') return
