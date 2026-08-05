@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { renderLayers } from '../engine/render'
-import { SLOTS_PER_CANVAS } from '../config'
-import { loadCanvasForViewing } from '../data/session'
+import { formatFor } from '../config'
+import { loadCanvasForViewing, type ViewLayer } from '../data/session'
 import { LEDGER_ENABLED } from '../lib/supabase'
-import { Replay, type ReplayLayer } from './Replay'
+import { Replay } from './Replay'
 import { renderTimelapseVideo, videoExportSupported } from '../engine/video'
+import { ReportButton } from './ReportButton'
+import { Footer } from './Footer'
 
 interface Props {
   canvasId: string
@@ -17,7 +19,7 @@ interface Loaded {
   closed: boolean
   slotCount: number
   closedAt: string | null
-  layers: ReplayLayer[]
+  layers: ViewLayer[]
 }
 
 function download(dataUrl: string, filename: string) {
@@ -35,6 +37,10 @@ function download(dataUrl: string, filename: string) {
  * means the archive has exactly one representation to keep honest. The
  * server-side MP4 render is the same walk over the same data and is the one
  * piece of milestone 4 still outstanding.
+ *
+ * It also serves a canvas that is still filling, which is not a lesser case:
+ * it is the link a player leaves with, and the only thing that will tell them
+ * their canvas finished until notifications exist.
  */
 export function CanvasPage({ canvasId }: Props) {
   const [state, setState] = useState<Loaded | null>(null)
@@ -116,16 +122,24 @@ export function CanvasPage({ canvasId }: Props) {
   }
 
   const hands = state.layers.length
+  const format = formatFor(state.slotCount)
+  const waiting = Math.max(0, state.slotCount - hands)
 
   return (
     <div className="panel">
-      <h1>“{state.seed}”</h1>
+      <h1>
+        “{state.seed}” <span className="chip">{format.title}</span>
+      </h1>
       <p>
         {state.closed
-          ? `Finished by ${hands} hands. It can never be changed.`
-          : `${hands} of ${state.slotCount} slots filled. Still open.`}
-        {state.closedAt &&
-          ` Closed ${new Date(state.closedAt).toLocaleDateString()}.`}
+          ? `Finished by ${format.hands} hands${
+              state.closedAt
+                ? ` on ${new Date(state.closedAt).toLocaleDateString()}`
+                : ''
+            }. It can never be changed.`
+          : waiting === 1
+            ? `${hands} of ${state.slotCount} hands. One more closes it.`
+            : `${hands} of ${state.slotCount} hands. Still filling.`}
       </p>
 
       <div className="scroll">
@@ -188,23 +202,46 @@ export function CanvasPage({ canvasId }: Props) {
             <LayerCard
               key={l.slotIndex}
               layer={l}
+              canvasId={canvasId}
               seed={state.seed}
+              slotCount={state.slotCount}
               width={state.width}
               height={state.height}
             />
           ))}
         </div>
+        {waiting > 0 && (
+          <div className="cards">
+            {Array.from({ length: waiting }, (_, i) => (
+              <div className="card waiting" key={i}>
+                <div className="card-placeholder" />
+                <figcaption>
+                  <span>{hands + i + 1} / {state.slotCount}</span>
+                  <span>waiting</span>
+                </figcaption>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="review-caption">Something wrong with it?</div>
+        <div className="row">
+          <ReportButton canvasId={canvasId} label="Report this canvas" />
+        </div>
+        <p className="stat">
+          One tap, nothing to write. A person reads these, and what we can do
+          is hide a hand or take the canvas off the shelf — never delete it.
+        </p>
       </div>
 
       <div className="row">
-        <a className="linkbtn" href="/gallery">
-          The gallery
-        </a>
         <div className="spacer" />
         <a className="linkbtn solid" href="/">
-          Take a slot
+          {state.closed ? 'Take a slot elsewhere' : 'Take a slot'}
         </a>
       </div>
+
+      <Footer gallery />
     </div>
   )
 }
@@ -212,12 +249,16 @@ export function CanvasPage({ canvasId }: Props) {
 /** The personal card: one contributor's layer on bare paper. */
 function LayerCard({
   layer,
+  canvasId,
   seed,
+  slotCount,
   width,
   height,
 }: {
-  layer: ReplayLayer
+  layer: ViewLayer
+  canvasId: string
   seed: string
+  slotCount: number
   width: number
   height: number
 }) {
@@ -233,7 +274,7 @@ function LayerCard({
       <img src={src} alt={`Slot ${layer.slotIndex}`} />
       <figcaption>
         <span>
-          {layer.slotIndex} / {SLOTS_PER_CANVAS}
+          {layer.slotIndex} / {slotCount}
         </span>
         <button
           className="linkbtn tiny"
@@ -249,6 +290,9 @@ function LayerCard({
           Save
         </button>
       </figcaption>
+      <div className="card-report">
+        <ReportButton canvasId={canvasId} layerId={layer.id} />
+      </div>
     </figure>
   )
 }

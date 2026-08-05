@@ -4,7 +4,6 @@ import type { Stroke } from '../engine/types'
 import {
   PEN_WIDTHS,
   SHOW_TUNER,
-  SLOTS_PER_CANVAS,
   TUNING,
   type Tuning,
 } from '../config'
@@ -12,10 +11,13 @@ import { FitIcon, UndoIcon } from './icons'
 import { Tuner } from './Tuner'
 import { TurnClock } from './TurnClock'
 import { PaletteBar } from './PaletteBar'
+import { ReportButton } from './ReportButton'
 
 interface Props {
   seed: string
   slot: number
+  /** How many hands this canvas takes. Read from the canvas, never a constant. */
+  slotCount: number
   /** Palette inheritance: what's already on the canvas, plus two new colours. */
   palette: string[]
   priorLayers: Stroke[][]
@@ -24,6 +26,8 @@ interface Props {
   height: number
   /** Epoch ms this turn runs out, or null when no clock is running. */
   expiresAt: number | null
+  /** Null in local mode, where there is nothing to report to. */
+  canvasId: string | null
   submitting: boolean
   /** A failed save. Shown over the drawing, which is never discarded. */
   submitError: string | null
@@ -35,11 +39,13 @@ interface Props {
 export function DrawTurn({
   seed,
   slot,
+  slotCount,
   palette,
   priorLayers,
   width,
   height,
   expiresAt,
+  canvasId,
   submitting,
   submitError,
   onDismissError,
@@ -117,7 +123,7 @@ export function DrawTurn({
 
       <header className="topbar">
         <div className="slot">
-          Slot {slot} / {SLOTS_PER_CANVAS}
+          Slot {slot} / {slotCount}
           <TurnClock expiresAt={expiresAt} onExpired={handleExpired} />
         </div>
         <div className="seed">“{seed}”</div>
@@ -180,6 +186,12 @@ export function DrawTurn({
         <div className="zoomtag">{zoomLabel}%</div>
         {showHint && !expired && (
           <div className="hint">Two fingers to move and zoom</div>
+        )}
+        {/* Only once there is somebody else's work on the sheet — an empty
+            canvas has nothing to report, and offering it anyway would read as
+            an invitation. */}
+        {canvasId && priorLayers.length > 0 && !expired && (
+          <ReportButton canvasId={canvasId} className="report-corner" />
         )}
         {submitError && !expired && (
           <div className="banner" role="alert">

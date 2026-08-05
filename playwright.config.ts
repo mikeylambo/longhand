@@ -23,6 +23,9 @@ function loadEnv(file: string) {
 loadEnv('.env.local')
 loadEnv('.env.test.local')
 
+/** The specs that talk to a database and therefore write rows. */
+const DB_SPECS = /(ledger|formats)\.spec\.ts/
+
 export default defineConfig({
   testDir: './tests',
   reporter: process.env.CI ? 'github' : 'list',
@@ -30,9 +33,13 @@ export default defineConfig({
   // Split so the database-backed specs are an explicit choice. `test:app` is
   // everything that needs nothing but a browser; `test:ledger` needs the
   // throwaway project and fails loudly without it.
+  //
+  // A spec that writes rows has to be named here. Left out, it lands in `app`,
+  // where it fails for want of credentials — loudly, which is the right
+  // failure, but it fails a run that is meant to need nothing but a browser.
   projects: [
-    { name: 'app', testIgnore: /ledger\.spec\.ts/ },
-    { name: 'ledger', testMatch: /ledger\.spec\.ts/ },
+    { name: 'app', testIgnore: DB_SPECS },
+    { name: 'ledger', testMatch: DB_SPECS },
   ],
   webServer: {
     // A port of its own, so a running dev server isn't disturbed by a test run.
