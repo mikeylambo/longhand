@@ -14,7 +14,10 @@
 -- Until it is called, nothing sends and nothing breaks. The queue is a table
 -- precisely so that a sender which does not exist yet costs nothing but delay.
 
-create extension if not exists pg_net with schema extensions;
+-- No `with schema`: pg_net brings its own `net` schema and refuses to be put
+-- anywhere else, so naming one is how this fails on the first deploy rather
+-- than on the first canvas that closes.
+create extension if not exists pg_net;
 
 /**
  * Schedules — or reschedules — the minute-by-minute poke.
@@ -47,6 +50,15 @@ begin
     raise exception 'that secret is too short to be worth having';
   end if;
 
+  -- Asked before scheduling, because a cron job that cannot resolve its own
+  -- command fails silently at 03:00 on a schedule nobody is watching. The
+  -- first version of this called `extensions.net.http_post`, which is a
+  -- three-part name Postgres reads as database.schema.function and is not
+  -- what pg_net is called at all.
+  if to_regprocedure('net.http_post(text, jsonb, jsonb, jsonb, integer)') is null then
+    raise exception 'pg_net is not providing net.http_post — nothing would send';
+  end if;
+
   if exists (select 1 from cron.job where jobname = 'longhand-notify') then
     perform cron.unschedule('longhand-notify');
   end if;
@@ -55,7 +67,7 @@ begin
     'longhand-notify',
     '* * * * *',
     format(
-      $cmd$select extensions.net.http_post(
+      $cmd$select net.http_post(
              url     := %L,
              headers := jsonb_build_object(
                           'Content-Type',     'application/json',
