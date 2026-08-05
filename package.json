@@ -11,7 +11,10 @@
     "test:app": "playwright test --project=app",
     "test:ledger": "playwright test --project=ledger",
     "backup": "scripts/backup.sh",
-    "restore": "scripts/restore.sh"
+    "restore": "scripts/restore.sh",
+    "verify-artifact": "scripts/verify-artifact.sh",
+    "moderate": "scripts/moderate.sh",
+    "welcome": "node scripts/make-welcome.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.111.0",

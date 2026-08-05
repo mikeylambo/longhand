@@ -2,10 +2,11 @@
 
 *A museum the world fills in, one stranger at a time.*
 
-Milestones 1–4 of the v1 brief: **the surface**, **the ledger**, **the loop**
-and **the close**. Twelve distinct hands claim slots on a shared sheet, each on
-a ten-minute clock, and when the twelfth submits the canvas locks forever and
-gets its own page. No accounts.
+Milestones 1–4 of the v1 brief — **the surface**, **the ledger**, **the loop**
+and **the close** — plus **Phase A**, which is everything that has to exist
+before a stranger sees it. Distinct hands claim slots on a shared sheet, each on
+a ten-minute clock, and when the last one submits the canvas locks forever and
+gets its own page. Two hands, four, or twelve. No accounts.
 
 ```bash
 npm install
@@ -105,10 +106,168 @@ double-booked and nothing is reserved forever:
 - The clock is visible from the first second, because per the brief an expired
   slot returns to the pool and the drawing is lost.
 
-**The close.** Slot 12 submits, the canvas flips to `closed`, and it gets a
-shareable page at `/c/<id>` with the full piece, the scrubbable timelapse, every
-contributor's layer alone, and PNG downloads. `/gallery` lists finished work,
-newest first — no counts, no ranking, no leaderboard, ever.
+**The close.** The last slot submits, the canvas flips to `closed`, and it gets
+a shareable page at `/c/<id>` with the full piece, the scrubbable timelapse,
+every contributor's layer alone, and PNG downloads. `/gallery` lists finished
+work, newest first — no counts, no ranking, no leaderboard, ever.
+
+**The first visit** — one screen, once, led by a six-second clip of a finished
+canvas assembling itself. See *The first thing a stranger sees* below.
+
+**Duos and quartets**, alongside twelves. See *Formats* below.
+
+**A moderation floor** — a report control that is one tap and no text field, a
+queue you read with one command, and the two levers: hide a layer, unlist a
+canvas. See *Moderation* below.
+
+**Terms and a position on young people**, at `/terms` and `/safety`, written
+before the first stranger drew rather than after.
+
+## Formats
+
+Two hands, four, or twelve. `slot_count` has been a column rather than a
+constant since migration 0001, so the engine, the close condition, the gallery
+and the video already handled any number; 0017 is the part that was missing.
+
+The reason is arithmetic, not variety. With a small population a twelve may
+never close, and a stranger who draws into a canvas that never closes has seen
+one twelfth of the product — no finished piece, no timelapse, no video, no hand
+of their own on bare paper. **A duo closes with one other person.** That turns a
+partial experience into a whole one, and it is the cheapest fix for cold start
+in the whole roadmap.
+
+**Assignment is biased toward the canvas closest to closing**, not the oldest.
+A twelve with eleven hands on it beats a fresh duo, because the point is that a
+stranger's hand is the one that finishes something as often as possible. It is
+a preference rather than a promise: remaining slots are counted from what has
+been submitted, so a canvas whose last free slot is held by a live turn sorts as
+though it were free — it just cannot be *chosen* while that turn lives.
+
+A player can also ask, from the review screen: *or ask for a duo · a quartet ·
+twelve hands*. Asking is deliberately the quiet option — taking whatever is
+closest to closing is the right answer for almost everybody.
+
+**New canvases open on a rotation** — duo, duo, quartet, twelve — derived from
+how many canvases exist, so it is deterministic and there is no counter to
+drift. The weights live in `canvas_formats` and can change without a deploy,
+which is also why `canvases.slot_count` is a foreign key into that table rather
+than a check constraint: a canvas cannot be opened at a size that is not a
+format, and the list of formats is data.
+
+`tests/formats.spec.ts` asserts every row in `canvas_formats` has a name in the
+client, so a format added to the table can never reach a player as a bare
+number.
+
+## The first thing a stranger sees
+
+One screen, once, and the clip does the teaching. A finished canvas assembling
+itself explains hands-arrive-one-at-a-time-and-nothing-goes-away without a word
+of instruction; every attempt to say it in prose was longer and worse.
+
+It is the same `buildTimeline`/`paintRange` walk as the scrubber and the MP4
+export, not a video file — so there is no muxing, no autoplay policy to
+negotiate, no audio track to promise is muted, and it is sharp on any screen.
+Six seconds to fill, a moment to look at it, then again.
+
+It ships as a **baked fixture** rather than the newest closed canvas.
+`scripts/make-welcome.mjs` renders the twelve fixture hands from
+`scripts/scene.mjs` into `public/welcome-canvas.json` (66 KB, 26 KB over the
+wire), which is the same scene `seed-canvas.mjs` pushes through the real
+endpoints. Reading the archive instead is wrong twice over: it is empty on
+launch day, which is the only day this screen really matters, and it would put
+whatever a stranger drew last night in front of the next stranger with nothing
+between the two but hope.
+
+Everything else on the screen answers a question somebody has before they will
+draw. The ink rule is stated as a promise *before* they draw rather than as a
+warning after they try. The count — "4 of 12 hands are already on the sheet you
+would join" — answers whether anyone else is here. The clock is explained once,
+gently, so ten minutes reads as room to think. The signature gets its reason on
+the screen that asks for it.
+
+No tutorial, no carousel, no dismissible tips over the sheet. If it takes more
+than one screen the product is the problem, and a longer explanation only hides
+that.
+
+`tests/onboarding.spec.ts` guards it, because the screen is behind a
+localStorage flag: once it has been seen it is invisible to whoever is
+developing, and you can break it thoroughly without noticing.
+
+## Moderation
+
+The tools exist before they are needed, which is the only time it is possible
+to build them calmly.
+
+**Reporting is one tap.** No form, no category, no text field — the drawing is
+the only channel this product has, and a reason box would be a message box
+wearing another name. There is a control on every canvas page, one on each hand,
+and one on the sheet during a turn (which appears only once somebody else's work
+is on it — an empty canvas has nothing to report, and offering it anyway reads
+as an invitation).
+
+A second tap from the same browser is collapsed rather than counted, so nobody
+can manufacture weight by tapping, and a device past thirty reports an hour is
+dropped. Neither is reported back: telling one browser it has been rate-limited
+only tells it how to spread its taps around.
+
+**The queue is one command.**
+
+```bash
+DATABASE_URL='postgresql://...' scripts/moderate.sh queue
+```
+
+Same connection string the nightly backup uses, and it is never printed. Then
+`hide <layer-id>`, `unlist <canvas-id>`, `dismiss <canvas-id>`, `show
+<canvas-id>` and `log`. Every action goes through a `service_role`-only function
+rather than a direct write, so it is recorded in `moderation_actions` and the
+reports it answers are resolved in the same breath.
+
+**Nothing here deletes anything, and no command could.** Hiding sets the one
+column the append-only trigger permits; the row stays in the ledger and stops
+being served. Unlisting takes a canvas off the shelf and leaves its URL working
+for everyone who drew on it.
+
+`open_or_join_canvas` also lost its grant here. It has been dead since 0004 —
+`claim_turn` does all of it, under a lock — but it was still executable by
+`anon`, which meant anyone with the publishable key could open empty canvases in
+a loop. The moderation surface is meant to be small, and an unused write path
+reachable by strangers is surface for nothing in return.
+
+## Terms and young people
+
+`/terms` and `/safety`, and they are part of the app rather than a file under
+`docs/` so there is exactly one copy. Terms applied retroactively to work people
+have already made cannot be cleaned up afterwards — you cannot go back and ask
+twelve strangers whether the licence they never read may change — so the words
+somebody agreed to have to be the words that shipped that day, and the history
+of `src/content/legal.ts` is that record.
+
+The position, in short:
+
+- **Each contributor owns their own layer.** No assignment of copyright, ever.
+  A finished canvas is a collective work and nobody owns the whole of it alone,
+  including us.
+- **What you grant is a non-exclusive, perpetual licence** to store, display,
+  render and print *the canvas your layer is part of*. Perpetual because the
+  archive is append-only — a licence that could be withdrawn would be a promise
+  this product is not built to keep — and non-exclusive so you keep every other
+  right you have, including selling prints of your own layer yourself.
+- **Never** sold on its own, never licensed on its own, and never used to train
+  a model.
+- **If prints are ever sold**, every contributor is told first and can decline
+  to be in the printed edition. That does not remove them from the canvas.
+- **Thirteen and up**, stated, with no age form. A date-of-birth box collects a
+  piece of personal information about a child in order to turn them away and
+  stops nobody. The honest position is a stated minimum age, a product that
+  collects nothing about anyone, and moderation that works.
+
+The safeguarding is the design: no chat, no comments, no DMs, no text tool, no
+avatars, nothing that says where anybody is, and nobody able to remove or deface
+what a child draws. Each of those absences is load-bearing and each is listed
+under *Never* in the roadmap for exactly this reason.
+
+**This has not been through a lawyer.** It should be before anything is sold,
+which is the moment the print line in Phase C arrives.
 
 ## Hand feel
 
@@ -282,9 +441,12 @@ three-stroke layer stored as slot 1 with 196 points and 3888px of ink at
 slot 2, loaded slot 1's strokes from the database, and was handed the inherited
 five-colour palette.
 
-Two advisory warnings remain and are meant to: `open_or_join_canvas` and
-`submit_layer` are `SECURITY DEFINER` and callable by `anon`. v1 has no
-accounts, so that is the product. Both carry a `COMMENT ON` saying so.
+One advisory warning remains and is meant to: `claim_turn`, `submit_turn` and
+`report_content` are `SECURITY DEFINER` and callable by `anon`. v1 has no
+accounts, so that is the product, and each carries a `COMMENT ON` saying so.
+`open_or_join_canvas` used to be on that list and no longer is — 0018 took its
+grant away, because it has been dead since 0004 and an unused write path
+reachable by strangers is surface for nothing in return.
 
 ## What the loop was tested against
 
@@ -453,6 +615,41 @@ It verifies more than row counts, because rows arriving proves nothing about
 whether the drawings survived: it sums the strokes and points inside the
 restored `layers`, and checks the append-only trigger came back armed.
 
+### The artifact itself
+
+Everything about the backup was verified except the last link. The nightly job
+checks its own dump, and the restore drill had been run — but against a dump
+produced locally, on the same machine, minutes earlier. What had never been
+exercised was the artifact: the file that would actually be reached for,
+downloaded from where it actually lives, onto a machine that is not the one that
+made it. That gap is where backups die, because everything upstream can be green
+while the thing you would restore from is a zip nobody has ever opened.
+
+```bash
+scripts/verify-artifact.sh                    # newest successful run
+scripts/verify-artifact.sh --restore          # and load it into a local stack
+scripts/verify-artifact.sh --file <dump.gz>   # one you already have
+```
+
+It downloads with `gh`, counts the rows inside the dump with the same COPY-block
+walk `backup.sh` uses — deliberately the same, so that if the two ever disagree
+it is clear one of them is reading the format wrong — and then checks the thing
+row counts cannot: that every layer row actually carries strokes, and that those
+strokes carry points. Rows arriving proves nothing about whether the drawings
+did. With `--restore` it hands the file to `restore.sh`, which is the whole
+drill against a real artifact rather than a local rehearsal of it.
+
+`--file` skips the download, which is how the off-site copy gets the same
+treatment: pull an object out of the bucket and point this at it.
+
+**It found something the first time it ran.** `canvas_formats` was missing from
+the truncate list in `restore.sh`, so restoring into a schema built from
+migrations collided on a duplicate key — the migration fills that table, and the
+dump filled it again. `reports` and `moderation_actions` were missing from both
+scripts for the same reason. That is precisely the class of bug this exists to
+find: invisible until the day you need the backup, and by then it is the worst
+possible day to find it.
+
 ### Practised, not assumed
 
 Run end to end on 2026-08-03 against a local stack holding the same content as
@@ -466,11 +663,17 @@ seed → backup → supabase db reset (canvases=0 layers=0) → restore
 
 Matching production's counts exactly.
 
-The one step not yet exercised is dumping production itself, which needs
-`SUPABASE_DB_URL`. Trigger the workflow manually once the secret exists and
-check the run summary before trusting the schedule.
+Production has since been dumped for real. The run on 2026-08-05 reported
+1 canvas and 12 layers, wrote a 42,456-byte compressed dump, and copied it
+off-site — so both halves of the nightly job are exercised against the live
+archive rather than a rehearsal of it.
 
 ### The off-site copy
+
+**Configured and landing.** The 2026-08-05 run copied both files to the bucket
+and read them back to check their sizes — 42,456 and 6,709 bytes — so the
+archive has genuinely stopped living in one failure domain. That was the second
+half of the backup closeout and it is done.
 
 Artifacts protect against losing the Supabase project. They protect against
 nothing else, because the repository and its artifacts share a failure domain
@@ -601,15 +804,35 @@ checked against a copy of the migration. The check that the client has not
 drifted from the *actual* `palette_colors` table lives in `tests/ledger.spec.ts`,
 where a database dependency belongs.
 
+The split is by what a spec needs, and it is declared once in
+`playwright.config.ts`. A spec that writes rows has to be named there; left out,
+it lands in `app`, where it fails for want of credentials — loudly, which is the
+right failure, but it fails a run that is meant to need nothing but a browser.
+
+| spec | needs | what it holds |
+|---|---|---|
+| `surface` | a browser | prediction, inertia, rubber-banding, two-finger undo |
+| `replay` | a browser | the timelapse walk is pixel-exact at any step count |
+| `video` | a browser | a real file comes out of the export |
+| `colour` | a browser | the client's eighty colours against a copy of the migration |
+| `onboarding` | a browser | the first visit, which is otherwise invisible once seen |
+| `ledger` | a database | the ink budget and the palette, against the real endpoint |
+| `formats` | a database | duos close; the moderation levers are unreachable by clients |
+
 ## Known gaps
 
 **The device key is a bearer token in local storage.** Clearing it loses your
 identity; copying it takes over your identity. Fine for a slice with no
 accounts, not fine for a launch.
 
-**No rate limit.** `submit_turn` caps a layer at 2 MB and 600 strokes and a turn
-must be claimed first, but nothing throttles repeated claims across many
-signatures.
+**No rate limit on claiming.** `submit_turn` caps a layer at 2 MB and 600
+strokes and a turn must be claimed first, but nothing throttles repeated claims
+across many signatures. Reporting *is* capped, at thirty an hour per browser,
+which is the only place a cap existed to be added cheaply.
+
+**Testing a close still takes real browsers, but far fewer.** A duo needs two,
+not twelve, which makes the whole loop — fill, close, timelapse, video, gallery
+— reachable in a single sitting with one other person for the first time.
 
 **Palette inheritance collapses under a burst of arrivals.** The palette is
 fixed at claim time so it cannot shift under someone mid-drawing — which is
@@ -628,11 +851,16 @@ specifies, and the clock is visible throughout — but auto-submitting non-empty
 work would keep the canvas moving *and* not destroy anything. Worth a decision
 after real strangers hit it.
 
-**Testing a close alone is now impossible on the ledger.** One hand per canvas
-is enforced in the database, so watching a canvas fill takes twelve real
-browsers — which is the brief's success criterion, not an obstacle to route
-around. Run without Supabase credentials for a solo relay when you only want to
-exercise the surface.
+**Testing a close alone is still impossible on the ledger.** One hand per canvas
+is enforced in the database, so watching a canvas fill takes real browsers —
+which is the brief's success criterion, not an obstacle to route around. Run
+without Supabase credentials for a solo relay when you only want to exercise the
+surface.
+
+**Nothing tells a contributor their canvas finished.** The canvas page is the
+only thing that will, so the review screen now says to keep the link. That is
+honest rather than good, and it is the biggest structural gap in the product —
+Milestone 5, first item in Phase B.
 
 ## The timelapse export
 
@@ -670,14 +898,42 @@ through the real endpoints. What lands in the ledger is shaped exactly like
 player data; the only thing faked is the hands. Every layer comes in under the
 10,000 budget, which is also a useful check that the budget is survivable.
 
+It asks for a twelve explicitly. Without that the ledger would send each hand to
+whatever is closest to closing, which is right for a player and wrong for a
+seed — the twelve fixture layers are one scene and belong on one sheet.
+
+The scene itself lives in `scripts/scene.mjs`, because `make-welcome.mjs` bakes
+the same twelve hands into the clip on the welcome screen and the two must not
+drift:
+
+```bash
+node scripts/make-welcome.mjs    # regenerates public/welcome-canvas.json
+```
+
 ## Not built yet
 
 A *server-side* render. The export above runs in the player's browser, which is
 fine for someone saving their own canvas but no use for generating an OG preview
 image or a video for a canvas nobody has opened. That needs a worker.
 
-Notifications (Milestone 5). Accounts, the world map, prints, school accounts —
-all explicitly out of scope for v1.
+Notifications (Milestone 5, and the first thing in Phase B). Accounts, the world
+map, prints, school accounts — all Phase C, and all gated on the archive being
+worth something first.
 
-No service worker yet. The manifest is in place; a caching strategy is worth
-nothing until there is something to be offline from.
+## Before this goes in front of strangers
+
+Phase A is built. What is left is not code:
+
+1. **Seed the production database with the format rotation in place**, or let it
+   fill naturally. Existing canvases are all twelves and stay that way; the
+   rotation only decides what opens next.
+2. **Run the twelve-stranger test.** Post the link where strangers are — not
+   friends, not an audience, not anyone who knows the work, because they will be
+   generous and tell you it is great, and that test is worthless. Run three or
+   four canvases on identical settings before tuning anything, or you are
+   reading noise.
+3. **Watch the timelapses before reading any feedback.** The question is whether
+   you want to send one to someone.
+4. **Close the phone half of `docs/friction.md`.** Hand feel is the one thing no
+   agent can judge, and that list names exactly which questions are waiting for
+   a real device.
