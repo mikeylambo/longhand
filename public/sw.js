@@ -10,7 +10,7 @@
  * it was finished yesterday would be a lie, and the archive is the asset.
  */
 
-const CACHE = 'longhand-v1'
+const CACHE = 'foolscap-v2'
 const SHELL = ['/', '/manifest.webmanifest', '/icon-192.png', '/apple-touch-icon.png']
 
 self.addEventListener('install', (event) => {
@@ -52,7 +52,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body: payload.body || '',
-      tag: payload.tag || 'longhand',
+      tag: payload.tag || 'foolscap',
       renotify: false,
       icon: '/icon-192.png',
       badge: '/icon-192.png',

@@ -54,6 +54,31 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>{route()}</StrictMode>,
 )
 
+/**
+ * Hands over from the splash in index.html.
+ *
+ * After a paint rather than on render, because render only means React has
+ * built the tree — dismissing there can uncover an unpainted frame, which is
+ * the white flash the splash exists to prevent. Two frames is the cheapest
+ * reliable "something is actually on screen".
+ *
+ * It is removed rather than left transparent over the app: a fixed element at
+ * z-index 9999 that stops being visible still swallows the first tap, and the
+ * first tap here is somebody starting to draw.
+ */
+requestAnimationFrame(() =>
+  requestAnimationFrame(() => {
+    const boot = document.getElementById('boot')
+    if (!boot) return
+    boot.classList.add('done')
+    const drop = () => boot.remove()
+    boot.addEventListener('transitionend', drop, { once: true })
+    // transitionend never fires under prefers-reduced-motion, where the
+    // transition is none. Belt and braces, and harmless if it has already gone.
+    setTimeout(drop, 600)
+  }),
+)
+
 // Offline shell. Only in production — a service worker in front of the dev
 // server turns every edit into a cache-invalidation puzzle.
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {

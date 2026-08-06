@@ -1,4 +1,4 @@
-# Longhand
+# Foolscap
 
 *A museum the world fills in, one stranger at a time.*
 
@@ -16,7 +16,15 @@ npm install
 npm run dev
 ```
 
-Deployed for phone testing at **https://longhand-kappa.vercel.app**.
+Deployed for phone testing at **https://longhand-kappa.vercel.app**. The name
+is **Foolscap** and the domain is **foolscap.ink**; the Vercel URL is where it
+answers until that is pointed at it. Storage keys are still `longhand.*` on
+purpose — see *Known gaps*.
+
+The repository, the Supabase project and the Vercel project all still read
+`longhand`. None of them is user-visible and renaming any of them costs more
+than it returns: the repo would break every existing clone and link, and the
+Supabase project ref is baked into the deployed client's env.
 
 ## Two modes
 
@@ -1015,6 +1023,15 @@ right failure, but it fails a run that is meant to need nothing but a browser.
 
 ## Known gaps
 
+**The storage keys still say `longhand`.** `longhand.device.v1`,
+`longhand.signature-id.v1`, `longhand.recovery.v1`, `longhand.signature.v1` and
+`longhand.welcomed.v1` kept their names through the rename to Foolscap, on
+purpose. They are internal and never seen; renaming them would log out every
+existing browser for no gain, which is the same origin-scoping problem as
+moving domains and with none of the benefit. If they are ever renamed it has to
+be a migration that reads the old key and writes the new one, not a find and
+replace.
+
 **The device key is a bearer token in local storage.** Clearing it no longer
 loses a mark — that is what B1's recovery key is for, minted on request, shown
 once, stored only as a digest — but that only helps somebody who took one.
@@ -1142,20 +1159,24 @@ credentials rather than code.
 Everything on the roadmap is built, and **it is deployed**. Production is at
 migration 0029, the client is live, and the seeds are in — 5 formats, 41
 places, 4 ink sets. `docs/deploy.md` is the record of how it went, including
-the two faults that only a real Supabase could have shown.
+the three faults that only a real Supabase could have shown — the third of
+which, in 0030, meant nobody could sign at all.
 
 One thing to settle before a *public* launch, as opposed to a playtest:
-**the domain.** Identity, push subscriptions and the service worker are all
-scoped to the origin, and everything that makes somebody a returning person
-lives in `localStorage`. Moving off `longhand-kappa.vercel.app` later means
-every returning visitor arrives as a new device with no mark, and every push
-subscription collected until then is discarded. The canvases themselves are
-server-side and survive a move; only the browser's claim to them breaks, and
-only a recovery key can carry that across. Cheap now, at 0 subscriptions.
-Unfixable later for anyone who did not take a key.
+**pointing foolscap.ink at Vercel.** The domain is bought and the name is
+decided; what is left is the DNS and the Vercel domain setting.
+
+Do it before collecting anything. Identity, push subscriptions and the service
+worker are all scoped to the origin, and everything that makes somebody a
+returning person lives in `localStorage`. Every visitor who arrives on
+`longhand-kappa.vercel.app` and returns after the move arrives as a new device
+with no mark, and every push subscription taken until then is discarded. The
+canvases themselves are server-side and survive a move; only the browser's
+claim to them breaks, and only a recovery key carries that across. Free today
+at 0 subscriptions. Unfixable later for anyone who did not take a key.
 
 A playtest does not need it. Run one on the Vercel URL, treat tester identity
-as disposable, and nothing is committed — not the origin, and not the name.
+as disposable, and nothing is lost that was not already disposable.
 
 What is left is not code:
 

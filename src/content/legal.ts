@@ -39,7 +39,7 @@ export const TERMS: Doc = {
     {
       heading: 'What you grant, by drawing',
       paragraphs: [
-        'When you submit a layer you grant Longhand a non-exclusive, worldwide, royalty-free, perpetual licence to store it, to display it as part of the canvas it belongs to, to render it into images and timelapse video of that canvas, and to reproduce that canvas in print.',
+        'When you submit a layer you grant Foolscap a non-exclusive, worldwide, royalty-free, perpetual licence to store it, to display it as part of the canvas it belongs to, to render it into images and timelapse video of that canvas, and to reproduce that canvas in print.',
         'The licence is perpetual because the archive is append-only. Nothing is ever deleted from it, so a licence that could be withdrawn would be a promise this product is not built to keep. What can happen instead is that a layer stops being served — see “Having your work taken down”.',
         'It is non-exclusive, so you keep every other right you have. You can post your layer anywhere you like, sell prints of it yourself, or licence it to somebody else, without asking us.',
         'You grant every other contributor to that canvas the same right to display, share and reproduce the finished canvas that their own layer is part of. Twelve people cannot each hold a veto over one picture.',
@@ -50,7 +50,7 @@ export const TERMS: Doc = {
       paragraphs: [
         'We will not sell your layer on its own, or licence it on its own to anyone else.',
         'We will not use your work to train machine-learning models, and we will not licence it to anybody else for that purpose.',
-        'We will not put your work in advertising for something that is not Longhand.',
+        'We will not put your work in advertising for something that is not Foolscap.',
         'If prints of finished canvases are ever sold, every contributor to that canvas will be told before it happens and will be able to decline having their layer reproduced in something sold. That is not a policy we intend to keep in good faith — it is how the feature is built: asking for a print asks everybody who drew on the canvas, nothing is made until all of them have said yes, and a single no ends it. Declining removes your layer from the printed edition; it does not remove it from the canvas or from the archive.',
       ],
     },
@@ -101,7 +101,7 @@ export const SAFETY: Doc = {
     {
       heading: 'Thirteen and up',
       paragraphs: [
-        'Longhand is for people aged 13 and over. If you are younger than that, this is not for you yet — not because of anything you would do, but because a public canvas that strangers draw on is not something we can supervise for you.',
+        'Foolscap is for people aged 13 and over. If you are younger than that, this is not for you yet — not because of anything you would do, but because a public canvas that strangers draw on is not something we can supervise for you.',
         'There is no age form, and that is deliberate. A date-of-birth box collects a piece of personal information about a child in order to turn them away, and it stops nobody. The honest position is a stated minimum age, a product that collects nothing about anyone, and moderation that works.',
         'Classrooms are the exception, and they are built rather than promised: a canvas inside a classroom is never handed to a stranger by the relay and never appears in the gallery or on the world map. Getting in takes a six-character code read out by whoever is running the class. There are still no accounts for children — no email, no name, no password — because a mark and a code is the whole of what a classroom needs.',
         'A school using the *public* canvases should still treat them as a public space, because they are one. The code is the difference.',

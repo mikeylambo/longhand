@@ -239,12 +239,36 @@ extensions that cannot be installed locally:
 
 A Supabase branch would have covered both. Branching needs the Pro plan.
 
-Neither of the two problems the deploy turned up would have been caught by any
-of that, incidentally, and it is worth being honest about why: both were
-differences between a bare PostgreSQL and Supabase specifically, and the test
-suite runs against a bare PostgreSQL. The check now at the top of 0021 is the
-answer to that — not another test, but an assertion inside the migration, which
-runs wherever the migration runs.
+None of the three problems the deploy turned up would have been caught by any
+of that, and it is worth being honest about why: all three were differences
+between a bare PostgreSQL and Supabase specifically, and the test suite runs
+against a bare PostgreSQL. The checks now at the top of 0021 and the foot of
+0030 are the answer — not more tests, but assertions inside the migrations,
+which run wherever the migrations run.
+
+### The third one, which was the expensive one
+
+`signatures_register_device`, the trigger 0021 puts on `signatures`, was left
+SECURITY INVOKER. It therefore ran as `anon`, and the same migration revokes
+everything on `signature_devices` from `anon`. Every attempt to sign raised
+`permission denied for table signature_devices`, and because a trigger's
+failure rolls back the statement that fired it, the signature row went with
+it. **Nobody could make a mark from the moment 0021 reached production**, which
+is to say nobody could do anything at all — signing is the gate to the whole
+product. It went unnoticed for three days because the deploy verified the
+schema, not the flow.
+
+The lesson is narrower than "test more". A bare PostgreSQL has no `anon`, and
+every privilege check in that file passes trivially as the owner. The class of
+bug is invisible without the role, so 0030 ends by doing the thing the client
+does — `set local role anon`, insert a signature, assert the device row landed,
+clean up — inside the migration. Anything that breaks signing again fails
+there rather than in front of somebody trying to sign.
+
+Worth repeating for the next migration that adds a trigger: `signatures` is the
+only table the client writes to directly. Everything else goes through a
+definer RPC, where triggers already run as the owner. A trigger on `signatures`
+is the one place this matters.
 
 ## What is still outstanding
 

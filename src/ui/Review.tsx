@@ -63,7 +63,7 @@ export function Review({ canvas, layer, signature, mode, onNext }: Props) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `longhand-layer-${slot}.json`
+    a.download = `foolscap-layer-${slot}.json`
     a.click()
     URL.revokeObjectURL(url)
   }

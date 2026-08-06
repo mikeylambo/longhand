@@ -65,7 +65,7 @@ export function CanvasPage({ canvasId }: Props) {
         onProgress: setVideoProgress,
       })
       const url = URL.createObjectURL(blob)
-      download(url, `longhand-${loaded.seed}.${extension}`)
+      download(url, `foolscap-${loaded.seed}.${extension}`)
       // Revoked late: Safari cancels an in-flight download if the object URL
       // goes away too soon.
       setTimeout(() => URL.revokeObjectURL(url), 60_000)
@@ -168,7 +168,7 @@ export function CanvasPage({ canvasId }: Props) {
           <button
             className="linkbtn"
             onClick={() =>
-              full && download(full.toDataURL('image/png'), `longhand-${state.seed}.png`)
+              full && download(full.toDataURL('image/png'), `foolscap-${state.seed}.png`)
             }
           >
             Download the canvas
@@ -178,7 +178,7 @@ export function CanvasPage({ canvasId }: Props) {
             onClick={async () => {
               const url = location.href
               try {
-                if (navigator.share) await navigator.share({ title: `Longhand — “${state.seed}”`, url })
+                if (navigator.share) await navigator.share({ title: `Foolscap — “${state.seed}”`, url })
                 else {
                   await navigator.clipboard.writeText(url)
                   setCopied(true)
@@ -323,7 +323,7 @@ function LayerCard({
               renderLayers(width, height, [layer.strokes], {
                 scale: 1,
               }).toDataURL('image/png'),
-              `longhand-${seed}-slot-${layer.slotIndex}.png`,
+              `foolscap-${seed}-slot-${layer.slotIndex}.png`,
             )
           }
         >
