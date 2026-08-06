@@ -155,6 +155,40 @@ secret, and over psql that value never leaves the process.
 > failed at the last step, after the secrets were stored and the sender
 > deployed, and blamed the project link for it.
 
+### Without installing anything
+
+The CLI is not required. A VAPID keypair is a P-256 keypair and a browser can
+make one — open the console on the deployed site, which is HTTPS and therefore
+a secure context, and paste:
+
+```js
+const kp = await crypto.subtle.generateKey({name:'ECDSA', namedCurve:'P-256'}, true, ['sign','verify'])
+const raw = await crypto.subtle.exportKey('raw', kp.publicKey)
+const jwk = await crypto.subtle.exportKey('jwk', kp.privateKey)
+const b64 = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
+console.log('VAPID_PUBLIC_KEY ', b64(raw))
+console.log('VAPID_PRIVATE_KEY', jwk.d)
+console.log('NOTIFY_SECRET    ', b64(crypto.getRandomValues(new Uint8Array(24))))
+```
+
+The same pair `web-push` would emit: the uncompressed public point and its
+scalar, both base64url. Generated locally, nothing transmitted, nothing
+installed.
+
+Then Dashboard → Edge Functions → Secrets, four values — `VAPID_PUBLIC_KEY`,
+`VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`, `NOTIFY_SECRET` — and one line in the SQL
+editor:
+
+```sql
+select public.schedule_notify(
+  'https://<ref>.supabase.co/functions/v1/notify', '<NOTIFY_SECRET>');
+```
+
+`VAPID_SUBJECT` is `mailto:` or `https://`, and it is a decision rather than a
+value: it goes to Apple and Google in every push, so it wants to be an address
+meant to leave the building. An alias on the project's own domain is the tidy
+answer, which is one reason the domain is worth settling first.
+
 ## 3. The client
 
 Vercel → Project → Settings → Environment Variables, for Production and

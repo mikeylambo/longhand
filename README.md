@@ -1015,9 +1015,15 @@ right failure, but it fails a run that is meant to need nothing but a browser.
 
 ## Known gaps
 
-**The device key is a bearer token in local storage.** Clearing it loses your
-identity; copying it takes over your identity. Fine for a slice with no
-accounts, not fine for a launch.
+**The device key is a bearer token in local storage.** Clearing it no longer
+loses a mark — that is what B1's recovery key is for, minted on request, shown
+once, stored only as a digest — but that only helps somebody who took one.
+
+Copying a device key still takes over a mark, and redeeming a recovery key does
+not revoke it: `redeem_recovery_key` adds a row to `signature_devices`, so the
+copied key keeps working alongside the new one. Revocation is what an account
+would buy, and not buying one is the product. This stays on the list as the
+known cost of that.
 
 **No rate limit on claiming.** `submit_turn` caps a layer at 2 MB and 600
 strokes and a turn must be claimed first, but nothing throttles repeated claims
@@ -1028,17 +1034,26 @@ which is the only place a cap existed to be added cheaply.
 not twelve, which makes the whole loop — fill, close, timelapse, video, gallery
 — reachable in a single sitting with one other person for the first time.
 
-**Palette inheritance collapses under a burst of arrivals.** The palette is
-fixed at claim time so it cannot shift under someone mid-drawing — which is
-right — but it inherits from what has been *submitted*, not from what has been
-claimed. Twelve people who all claim before anyone submits therefore all get the
-full sixteen colours, and the cohesion mechanic does nothing. Seeding a canvas
-reproduces this exactly: all twelve slots were offered 16.
+**Palette inheritance is off, and that is a decision rather than a gap.** It is
+recorded here because the reasoning is easy to lose and the mechanic is still
+live behind a dial.
 
-Staggered arrivals work fine, but a shared link produces precisely the burst
-that defeats it. The fix is a design call, not a one-liner — either inherit from
-live turns as well as submitted layers, or recompute at submit and accept that
-the palette can shift mid-turn. Worth settling before the first real canvas.
+It used to ration which of the sixteen each player could touch, inheriting from
+what had been *submitted*. It never survived a burst: the palette is fixed at
+claim time — correctly, so it cannot shift under someone mid-drawing — so
+twelve people arriving on a shared link all claimed before anyone submitted and
+all got the full set anyway. Seeding a canvas reproduced it exactly.
+
+`0010_full_palette.sql` turned it off, and that practical failure was the
+smaller of its two reasons. Cohesion comes from the sixteen being hand-picked
+muted tones that cannot clash badly, not from rationing which of them a player
+may use. The restriction was a second-order rule on top of an already-strong
+one, and it cost the last players their range for very little.
+
+Switched off rather than deleted: `p_floor` in `inherited_palette` is the dial.
+16 tops everyone up to the full set (off), 6 restores a floor, 0 is the brief's
+literal rule. It must agree with `PALETTE_MIN` in `src/config.ts`, because
+`submit_turn` rejects any colour a turn was not offered.
 
 **Losing an unsubmitted drawing at 10:00 is harsh.** It is what the brief
 specifies, and the clock is visible throughout — but auto-submitting non-empty
@@ -1051,10 +1066,15 @@ which is the brief's success criterion, not an obstacle to route around. Run
 without Supabase credentials for a solo relay when you only want to exercise the
 surface.
 
-**Nothing tells a contributor their canvas finished.** The canvas page is the
-only thing that will, so the review screen now says to keep the link. That is
-honest rather than good, and it is the biggest structural gap in the product —
-Milestone 5, first item in Phase B.
+**Nothing tells a contributor their canvas finished — yet.** The queue, the
+sender and the schedule are all built (B1), and the sender is deployed to
+production. It is not sending: it has no VAPID keys and nothing is scheduled,
+so the review screen still says to keep the link, which stays the honest
+instruction until the keys are in.
+
+Nothing is lost while it is off. The queue is a table precisely so that a
+sender which is not running costs only delay. `docs/deploy.md` §2 is what turns
+it on.
 
 ## The timelapse export
 
@@ -1110,24 +1130,39 @@ A *server-side* render. The export above runs in the player's browser, which is
 fine for someone saving their own canvas but no use for generating an OG preview
 image or a video for a canvas nobody has opened. That needs a worker.
 
-Notifications (Milestone 5, and the first thing in Phase B). Accounts, the world
-map, prints, school accounts — all Phase C, and all gated on the archive being
-worth something first.
+Accounts. The world map, prints and school accounts are built but Phase C, and
+all gated on the archive being worth something first.
+
+Notifications are built and deployed but not sending — see Known gaps above,
+and `docs/deploy.md` §2 for the two things still missing, both of which are
+credentials rather than code.
 
 ## Before this goes in front of strangers
 
-Everything on the roadmap is built. **None of it is deployed** — production is
-at migration 0016, and 0017 through 0028 exist only in this repository.
-`docs/deploy.md` is the order and the reason for the order, the short version
-being that the migrations go first because the client that is live today keeps
-working against the new schema and the new client does not work against the
-old one.
+Everything on the roadmap is built, and **it is deployed**. Production is at
+migration 0029, the client is live, and the seeds are in — 5 formats, 41
+places, 4 ink sets. `docs/deploy.md` is the record of how it went, including
+the two faults that only a real Supabase could have shown.
 
-After that, what is left is not code:
+One thing to settle before a *public* launch, as opposed to a playtest:
+**the domain.** Identity, push subscriptions and the service worker are all
+scoped to the origin, and everything that makes somebody a returning person
+lives in `localStorage`. Moving off `longhand-kappa.vercel.app` later means
+every returning visitor arrives as a new device with no mark, and every push
+subscription collected until then is discarded. The canvases themselves are
+server-side and survive a move; only the browser's claim to them breaks, and
+only a recovery key can carry that across. Cheap now, at 0 subscriptions.
+Unfixable later for anyone who did not take a key.
 
-1. **Seed the production database with the format rotation in place**, or let it
-   fill naturally. Existing canvases are all twelves and stay that way; the
-   rotation only decides what opens next.
+A playtest does not need it. Run one on the Vercel URL, treat tester identity
+as disposable, and nothing is committed — not the origin, and not the name.
+
+What is left is not code:
+
+1. **Close a duo first, with one other person.** Two real browsers is the
+   cheapest thing that exercises the whole loop — claim, draw, submit, close,
+   timelapse, gallery — and nothing has done that yet. It is a single sitting,
+   and it will find more than another read-through would.
 2. **Run the twelve-stranger test.** Post the link where strangers are — not
    friends, not an audience, not anyone who knows the work, because they will be
    generous and tell you it is great, and that test is worthless. Run three or
@@ -1146,7 +1181,12 @@ After that, what is left is not code:
    canvases come back as noise, the answer is to set a tool's chip aside rather
    than to tune it — the tray is one array in `DrawTurn.tsx`.
 
-Two things need accounts nobody here can open: **VAPID keys** before any
-notification sends, and **a payment processor and a print vendor** before a
-print or an ink set can be sold. Both are built up to exactly that line and
-stop there.
+Two things need credentials nobody here can mint: **a VAPID keypair and a
+contact address** before any notification sends, and **a payment processor and
+a print vendor** before a print or an ink set can be sold. Both are built up to
+exactly that line and stop there.
+
+The keypair is a browser console away and needs nothing installed —
+`docs/deploy.md` §2. The contact address is the part worth thinking about,
+because it travels to Apple and Google in every push, which is one more reason
+the domain comes first.
