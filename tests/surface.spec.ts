@@ -225,3 +225,57 @@ test('a two-finger tap undoes', async ({ page }) => {
   expect(out.afterTap, 'two-finger tap did not undo').toBe(2)
   expect(out.afterDrag, 'a two-finger pan must not undo').toBe(2)
 })
+
+test('redo puts back exactly what undo took, and a new mark forfeits it', async ({ page }) => {
+  await page.goto('/')
+  const out = await page.evaluate(`(async () => {
+    ${HARNESS}
+    const draw = async (yOff) => {
+      const y = r.height * 0.35 + yOff
+      ev('pointerdown', r.width * 0.25, y)
+      for (let i = 1; i <= 12; i++) await move(() => ev('pointermove', r.width * 0.25 + i * 10, y))
+      ev('pointerup', r.width * 0.25 + 120, y)
+      await frame()
+    }
+    for (const off of [0, 60, 120]) await draw(off)
+
+    const drawn = { n: s.strokeCount, ink: s.inkUsed }
+
+    s.undo(); s.undo(); await frame()
+    const undone = { n: s.strokeCount, ink: s.inkUsed, canRedo: s.canRedo }
+
+    s.redo(); s.redo(); await frame()
+    const redone = { n: s.strokeCount, ink: s.inkUsed, canRedo: s.canRedo }
+
+    // Undo once, then draw something else: the branch must be gone.
+    s.undo(); await frame()
+    const hadRedo = s.canRedo
+    await draw(180)
+    const afterNewMark = { n: s.strokeCount, canRedo: s.canRedo }
+
+    return { drawn, undone, redone, hadRedo, afterNewMark }
+  })()`) as {
+    drawn: { n: number; ink: number }
+    undone: { n: number; ink: number; canRedo: boolean }
+    redone: { n: number; ink: number; canRedo: boolean }
+    hadRedo: boolean
+    afterNewMark: { n: number; canRedo: boolean }
+  }
+
+  expect(out.drawn.n, 'three strokes did not land').toBe(3)
+  expect(out.drawn.ink).toBeGreaterThan(0)
+
+  expect(out.undone.n, 'two undos did not remove two strokes').toBe(1)
+  expect(out.undone.ink, 'undo did not give the ink back').toBeLessThan(out.drawn.ink)
+  expect(out.undone.canRedo, 'nothing was offered to redo').toBe(true)
+
+  expect(out.redone.n, 'redo did not restore both strokes').toBe(3)
+  // The point of holding the strokes rather than redrawing them: the ink is
+  // the same measurement, not a similar one.
+  expect(out.redone.ink, 'redo did not restore the exact ink').toBeCloseTo(out.drawn.ink, 6)
+  expect(out.redone.canRedo, 'redo stack should be spent').toBe(false)
+
+  expect(out.hadRedo, 'undo should have left something to redo').toBe(true)
+  expect(out.afterNewMark.n, 'the new stroke did not land').toBe(3)
+  expect(out.afterNewMark.canRedo, 'a new mark must forfeit the redo branch').toBe(false)
+})

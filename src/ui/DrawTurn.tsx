@@ -8,7 +8,7 @@ import {
   TUNING,
   type Tuning,
 } from '../config'
-import { FitIcon, ToolsIcon, UndoIcon } from './icons'
+import { FitIcon, RedoIcon, ToolsIcon, UndoIcon } from './icons'
 import { Tuner } from './Tuner'
 import { TurnClock } from './TurnClock'
 import { PaletteBar } from './PaletteBar'
@@ -78,6 +78,7 @@ export function DrawTurn({
   const [ink, setInk] = useState(0)
   const [budget, setBudget] = useState(TUNING.inkBudget)
   const [strokeCount, setStrokeCount] = useState(0)
+  const [redoable, setRedoable] = useState(0)
   const [zoom, setZoom] = useState(1)
   const [fitScale, setFitScale] = useState(1)
   const [color, setColor] = useState<string>(palette[0])
@@ -114,6 +115,7 @@ export function DrawTurn({
         setBudget(b)
       },
       onStrokes: setStrokeCount,
+      onRedoable: setRedoable,
       onZoom: (z, f) => {
         setZoom(z)
         setFitScale(f)
@@ -232,6 +234,16 @@ export function DrawTurn({
             aria-label="Undo your last stroke"
           >
             <UndoIcon />
+          </button>
+          {/* Sits next to undo and is disabled rather than hidden, so the tray
+              does not change height the first time anything is undone. */}
+          <button
+            className="tool"
+            disabled={redoable === 0}
+            onClick={() => surfaceRef.current?.redo()}
+            aria-label="Redo the stroke you undid"
+          >
+            <RedoIcon />
           </button>
           <button
             className="tool"

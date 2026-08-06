@@ -16,6 +16,15 @@ export const UndoIcon = () => (
   </svg>
 )
 
+/** Undo, mirrored. Deliberately the same arrow rather than a different one:
+ *  the pair reads as one control with two directions. */
+export const RedoIcon = () => (
+  <svg {...base} aria-hidden>
+    <path d="M20 9H10a5 5 0 0 0 0 10h4" />
+    <path d="M16 5l4 4-4 4" />
+  </svg>
+)
+
 export const FitIcon = () => (
   <svg {...base} aria-hidden>
     <path d="M4 9V5h4" />

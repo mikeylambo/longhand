@@ -39,6 +39,10 @@ export interface SurfaceOptions {
   fitPad?: number
   onInk?: (used: number, budget: number) => void
   onStrokes?: (count: number) => void
+  /** How many strokes are waiting to be put back, so a redo control can know
+   *  whether it has anything to do. Reported alongside the stroke count
+   *  because the two only ever change together. */
+  onRedoable?: (count: number) => void
   onZoom?: (scale: number, fitScale: number) => void
 }
 
@@ -99,6 +103,22 @@ export class Surface {
 
   private priorLayers: Stroke[][] = []
   private turnStrokes: Stroke[] = []
+
+  /**
+   * Undone strokes, newest last, waiting to be put back.
+   *
+   * Held rather than recomputed because a stroke is the sampled path plus its
+   * measured ink, and neither survives being thrown away — redrawing it would
+   * be a different stroke that happened to look similar.
+   *
+   * Ink needs no bookkeeping here: `inkUsed` sums `turnStrokes`, so a stroke
+   * that is not in that array costs nothing and costs exactly its old amount
+   * again the moment it returns. Nothing to drift.
+   *
+   * Cleared by any new mark, which is the ordinary rule — once you have drawn
+   * something else, the branch you undid is not somewhere you can get back to.
+   */
+  private redoStack: Stroke[] = []
 
   private color: string
   private sizeIndex = 1
@@ -252,9 +272,27 @@ export class Surface {
     return this.drawing !== null || this.texturing !== null
   }
 
+  get canUndo(): boolean {
+    return !this.drawing && this.turnStrokes.length > 0
+  }
+
+  get canRedo(): boolean {
+    return !this.drawing && this.redoStack.length > 0
+  }
+
   undo(): void {
-    if (this.drawing || this.turnStrokes.length === 0) return
-    this.turnStrokes.pop()
+    if (!this.canUndo) return
+    const s = this.turnStrokes.pop()
+    if (s) this.redoStack.push(s)
+    this.rebuildTurn()
+    this.report()
+    this.invalidate()
+  }
+
+  redo(): void {
+    if (!this.canRedo) return
+    const s = this.redoStack.pop()
+    if (s) this.turnStrokes.push(s)
     this.rebuildTurn()
     this.report()
     this.invalidate()
@@ -263,6 +301,7 @@ export class Surface {
   clearTurn(): void {
     this.abortStroke()
     this.turnStrokes = []
+    this.redoStack = []
     this.turnStart = performance.now()
     this.rebuildTurn()
     this.report()
@@ -575,6 +614,7 @@ export class Surface {
   private report(): void {
     this.opts.onInk?.(this.inkUsed, this.opts.inkBudget)
     this.opts.onStrokes?.(this.turnStrokes.length)
+    this.opts.onRedoable?.(this.redoStack.length)
   }
 
   private onContextMenu = (e: Event) => e.preventDefault()
@@ -766,6 +806,7 @@ export class Surface {
       // field set at the end.
       if (this.tool === 'wash') s.mode = 'w'
       this.turnStrokes.push(s)
+      this.redoStack.length = 0
       this.clipped(this.tctx, this.cachedView, (ctx) =>
         drawSegments(ctx, s, this.liveDrawn, s.pts.length),
       )
@@ -795,6 +836,7 @@ export class Surface {
    *  the only copy of anybody else's work the surface holds. */
   private commit(strokes: Stroke[]): void {
     if (strokes.length === 0) return
+    this.redoStack.length = 0
     for (const s of strokes) {
       this.turnStrokes.push(s)
       this.clipped(this.tctx, this.cachedView, (ctx) => drawStroke(ctx, s))

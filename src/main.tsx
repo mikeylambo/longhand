@@ -57,25 +57,38 @@ createRoot(document.getElementById('root')!).render(
 /**
  * Hands over from the splash in index.html.
  *
- * After a paint rather than on render, because render only means React has
- * built the tree — dismissing there can uncover an unpainted frame, which is
- * the white flash the splash exists to prevent. Two frames is the cheapest
- * reliable "something is actually on screen".
+ * Two conditions, whichever is later: the app has actually painted, and the
+ * splash has been up long enough to have been a moment rather than a flicker.
  *
- * It is removed rather than left transparent over the app: a fixed element at
- * z-index 9999 that stops being visible still swallows the first tap, and the
- * first tap here is somebody starting to draw.
+ * The paint half waits two animation frames rather than dismissing on render,
+ * because render only means React has built the tree — leaving there can
+ * uncover an unpainted frame, which is the white flash the splash exists to
+ * prevent.
+ *
+ * The time half exists because a fast connection was the ugly case: the
+ * wordmark appeared and vanished inside a few hundred milliseconds, which
+ * reads as a glitch, not as opening. A floor means a returning visitor sees
+ * the same opening as a first-time one on a slow phone, and it is the one
+ * number here worth tuning by feel.
  */
+const SPLASH_FLOOR_MS = 1400
+const splashShownAt = performance.now()
+
+function dismissSplash() {
+  const boot = document.getElementById('boot')
+  if (!boot) return
+  boot.classList.add('done')
+  const drop = () => boot.remove()
+  boot.addEventListener('transitionend', drop, { once: true })
+  // transitionend never fires under prefers-reduced-motion, where the
+  // transition is none. Belt and braces, and harmless if it has already gone.
+  setTimeout(drop, 600)
+}
+
 requestAnimationFrame(() =>
   requestAnimationFrame(() => {
-    const boot = document.getElementById('boot')
-    if (!boot) return
-    boot.classList.add('done')
-    const drop = () => boot.remove()
-    boot.addEventListener('transitionend', drop, { once: true })
-    // transitionend never fires under prefers-reduced-motion, where the
-    // transition is none. Belt and braces, and harmless if it has already gone.
-    setTimeout(drop, 600)
+    const waited = performance.now() - splashShownAt
+    setTimeout(dismissSplash, Math.max(0, SPLASH_FLOOR_MS - waited))
   }),
 )
 

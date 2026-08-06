@@ -1077,6 +1077,25 @@ specifies, and the clock is visible throughout — but auto-submitting non-empty
 work would keep the canvas moving *and* not destroy anything. Worth a decision
 after real strangers hit it.
 
+**An unsubmitted drawing does not survive a reload, and that is worse than the
+clock.** Confirmed on production: draw, reload, and the turn resumes on the
+same slot with the same time left — correct — but the strokes are gone. They
+only ever lived in the surface's memory; nothing writes them anywhere until
+submit.
+
+Expiry is at least announced. This is not: no warning, no clock running out,
+and on a phone it does not need a deliberate reload to happen. iOS evicts
+backgrounded tabs freely, so a call, a notification tapped, or an app switch
+eight minutes into a turn can take the drawing with it — which is the exact
+moment the work is worth the most.
+
+The fix is small and does not touch the ledger: serialise `turnStrokes` to
+`localStorage` against the turn id on a debounce, restore on mount if the turn
+id still matches, drop it on submit or expiry. Local only, so it changes
+nothing about what the archive is or when a layer becomes real. Not built —
+flagged here because it is cheap and because a lost drawing is the one failure
+this product cannot apologise for.
+
 **Testing a close alone is still impossible on the ledger.** One hand per canvas
 is enforced in the database, so watching a canvas fill takes real browsers —
 which is the brief's success criterion, not an obstacle to route around. Run
@@ -1142,6 +1161,12 @@ node scripts/make-welcome.mjs    # regenerates public/welcome-canvas.json
 ```
 
 ## Not built yet
+
+**A logo.** The splash and the tab both show the name set in the body serif,
+which is a wordmark by default rather than by decision. It wants a real mark —
+something that works at 192px, at 512px maskable, as a favicon, and in one
+colour. The icons in `public/` are placeholders and should be replaced in the
+same pass, since `manifest.webmanifest` already names all three sizes.
 
 A *server-side* render. The export above runs in the player's browser, which is
 fine for someone saving their own canvas but no use for generating an OG preview
