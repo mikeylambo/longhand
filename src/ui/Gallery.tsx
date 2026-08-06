@@ -57,7 +57,15 @@ export function Gallery() {
         </div>
       </div>
 
-      {/* "Take a slot" was here; it is the Draw tab now. */}
+      {/* `/screen` is the same archive as a wall, for a room with a spare
+          display. It had no link anywhere either, which made it indisting-
+          uishable from a route somebody forgot to delete. It belongs here
+          rather than on a tab, because it is a thing you do *to* the gallery
+          rather than a fifth place to stand. */}
+      <p className="chooser quiet">
+        <a href="/screen">Show the archive as a wall</a>
+      </p>
+
       <Footer wander />
     </div>
   )

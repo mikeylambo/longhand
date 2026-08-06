@@ -1250,3 +1250,15 @@ a.linkbtn.solid {
   margin-top: 2px;
   opacity: 0.72;
 }
+
+/* A heading inside a scrolling panel — the classroom section on /mark, and
+   anything else that earns a break in a long screen. Matches the doc pages so
+   a secondary heading reads the same wherever it appears. */
+.sub {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 17px;
+  margin: 22px 0 6px;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule);
+}

@@ -282,13 +282,24 @@ export function MarkPage() {
         </div>
 
         {error && <p className="stat error">{error}</p>}
-      </div>
 
-      <div className="row">
-        <div className="spacer" />
-        <a className="linkbtn solid" href="/">
-          Take a slot
-        </a>
+        {/* Classrooms had no way in at all — the page existed and nothing
+            anywhere linked to it, so a teacher could only reach it by being
+            told the URL. It sits here because a class is something a person
+            sets up, and this is the page about the person. Inside the scroll
+            with everything else, so it does not hold a fixed strip of a phone
+            screen for something most people will never tap. */}
+        <h2 className="sub">A classroom</h2>
+        <p className="stat">
+          A private canvas for a group in a room together, joined with a code
+          read off a board. No accounts for anyone, and nothing a class makes
+          appears in the gallery.
+        </p>
+        <div className="row">
+          <a className="linkbtn" href="/class">
+            Open or join a classroom
+          </a>
+        </div>
       </div>
 
       <Footer wander />

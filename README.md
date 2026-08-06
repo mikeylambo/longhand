@@ -1070,10 +1070,26 @@ copied key keeps working alongside the new one. Revocation is what an account
 would buy, and not buying one is the product. This stays on the list as the
 known cost of that.
 
-**No rate limit on claiming.** `submit_turn` caps a layer at 2 MB and 600
-strokes and a turn must be claimed first, but nothing throttles repeated claims
-across many signatures. Reporting *is* capped, at thirty an hour per browser,
-which is the only place a cap existed to be added cheaply.
+**Claiming has a floor now, and it is a blunt one.** One active turn per mark
+was always enforced — `claim_turn` resumes rather than issuing a second — so
+the gap was making marks, which is one insert with a squiggle. 0031 caps new
+claims per address per hour, using the one thing the client cannot forge: the
+address the platform saw.
+
+The address is never stored. It is salted with a secret the database generated
+for itself, kept as a digest, and rows older than the window are deleted on
+every call — this product has never kept a record of who visited and should not
+start in exchange for this.
+
+Classrooms are deliberately exempt: `claim_classroom_turn` is a separate
+function and does not call the throttle. Twenty-four children on one school
+connection are one address, and a limit that could not tell the difference
+would break classrooms while looking like it worked.
+
+Limits live in `claim_limits` — 30 an hour by default — because anything an
+operator might change at 9pm on a Saturday should not be a deploy.
+`claim_throttle_health()` exists to catch the real failure, which is not the
+limit firing but the limit never firing because no address ever arrives.
 
 **Testing a close still takes real browsers, but far fewer.** A duo needs two,
 not twelve, which makes the whole loop — fill, close, timelapse, video, gallery
@@ -1196,6 +1212,18 @@ node scripts/make-welcome.mjs    # regenerates public/welcome-canvas.json
 ```
 
 ## Not built yet
+
+**A rendered image on a shared link.** `/c/<id>` now serves real `og:title`
+and `og:description` — the canvas named, and whether it is finished — through
+`api/canvas.ts`, a Vercel edge function that patches the shell it fetches from
+the deployment rather than holding a copy of the head that could drift. The
+image is still the app icon. Doing better means rasterising vector layers
+server-side, which is a prototype rather than a known quantity, and it is the
+one thing here I would not promise a shape for until it exists.
+
+Deliberately not crawler-sniffed: every request for `/c/<id>` gets the same
+document. Serving scrapers something different is cloaking, and it means the
+thing you tested is not the thing that ships.
 
 **A gallery worth living in.** It is a flat list of everything, newest first,
 with the canvases your mark is on captioned *yours*. That is enough to find
