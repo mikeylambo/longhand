@@ -1077,24 +1077,31 @@ specifies, and the clock is visible throughout — but auto-submitting non-empty
 work would keep the canvas moving *and* not destroy anything. Worth a decision
 after real strangers hit it.
 
-**An unsubmitted drawing does not survive a reload, and that is worse than the
-clock.** Confirmed on production: draw, reload, and the turn resumes on the
-same slot with the same time left — correct — but the strokes are gone. They
-only ever lived in the surface's memory; nothing writes them anywhere until
-submit.
+**An unsubmitted drawing now survives a reload.** It did not until
+`src/data/draft.ts`, and the failure was silent: the turn resumed on the same
+slot with the same time left, correctly, but the sheet came back empty. The
+strokes had only ever lived in the surface's memory.
 
-Expiry is at least announced. This is not: no warning, no clock running out,
-and on a phone it does not need a deliberate reload to happen. iOS evicts
-backgrounded tabs freely, so a call, a notification tapped, or an app switch
-eight minutes into a turn can take the drawing with it — which is the exact
-moment the work is worth the most.
+Kept in `localStorage`, through the same codec a layer is submitted through,
+so what comes back is exactly what would have been sent — a draft that
+restored more faithfully than submit would be a lie about what you had. Saved
+on a 500ms debounce, and flushed immediately on `pagehide` and on the tab
+going hidden, because the debounce is otherwise a window in which a phone can
+take the tab away. Cleared on a *successful* submit, not on the tap: clearing
+early would mean a dropped connection took both the save and the only other
+copy.
 
-The fix is small and does not touch the ledger: serialise `turnStrokes` to
-`localStorage` against the turn id on a debounce, restore on mount if the turn
-id still matches, drop it on submit or expiry. Local only, so it changes
-nothing about what the archive is or when a layer becomes real. Not built —
-flagged here because it is cheap and because a lost drawing is the one failure
-this product cannot apologise for.
+Restoring is refused unless the canvas, the slot, the expiry *and* the sheet
+size all match, so a slot that expired and was claimed again does not come
+back wearing last week's drawing.
+
+None of this is the ledger. Nothing here is sent anywhere and a draft has no
+bearing on when work becomes real — that is still submit, and only submit.
+
+One thing it does not survive: two tabs on two canvases overwrite each other's
+draft, since one draft is kept at a time. The turn key means the survivor
+still restores to the right turn and the other simply does not come back,
+which is what happened to both before any of this existed.
 
 **Testing a close alone is still impossible on the ledger.** One hand per canvas
 is enforced in the database, so watching a canvas fill takes real browsers —

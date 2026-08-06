@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Surface, type Tool } from '../engine/surface'
 import { STAMPS } from '../engine/tools'
 import type { Stroke } from '../engine/types'
@@ -14,6 +14,7 @@ import { TurnClock } from './TurnClock'
 import { PaletteBar } from './PaletteBar'
 import { washAllowed } from '../colour'
 import { ReportButton } from './ReportButton'
+import { clearDraft, loadDraft, saveDraft } from '../data/draft'
 
 /**
  * What the tray offers, in the order it offers it.
@@ -91,12 +92,22 @@ export function DrawTurn({
   const [toolsOpen, setToolsOpen] = useState(false)
   const [refusal, setRefusal] = useState<string | null>(null)
 
+  /** Which turn a draft belongs to. Stable across renders so the save effect
+   *  fires on the drawing changing, not on the component re-rendering. */
+  const draftTurn = useMemo(
+    () => ({ canvasId, slot, expiresAt }),
+    [canvasId, slot, expiresAt],
+  )
+
   // When the clock runs out the pen stops working, but the sheet stays on
   // screen — vanishing the drawing the instant it is lost would be crueller
   // than showing what was lost.
   const handleExpired = useCallback(() => {
     setExpired(true)
     surfaceRef.current?.setLocked(true)
+    // The turn is unrecoverable, so the draft is too. Dropped rather than left
+    // to rot: it can be most of a megabyte, and it will never match again.
+    clearDraft()
   }, [])
 
   useEffect(() => {
@@ -132,6 +143,13 @@ export function DrawTurn({
       ),
     )
     surfaceRef.current = s
+
+    // Before anything can be drawn, and only for this exact turn. A draft from
+    // a slot that has since expired and been reclaimed is not this turn's, and
+    // loadDraft refuses it on the key rather than trusting the caller.
+    const draft = loadDraft(draftTurn, width, height)
+    if (draft) s.restoreTurn(draft)
+
     return () => {
       surfaceRef.current = null
       s.destroy()
@@ -150,6 +168,45 @@ export function DrawTurn({
   useEffect(() => {
     if (strokeCount > 0) setShowHint(false)
   }, [strokeCount])
+
+  /**
+   * Keeps the draft in step with the sheet.
+   *
+   * Driven by the counts rather than by a stroke-ended callback because undo
+   * and redo change what is on the sheet without adding anything, and a draft
+   * that ignored them would restore work somebody had deliberately taken back.
+   *
+   * Debounced so that a burst — a fill, a row of stamps, a held undo — writes
+   * once. Half a second is well inside the gap between a tab going to the
+   * background and the OS deciding to discard it.
+   */
+  useEffect(() => {
+    const s = surfaceRef.current
+    if (!s || expired) return
+    const id = setTimeout(() => saveDraft(draftTurn, s.getLayer(), width, height), 500)
+    return () => clearTimeout(id)
+  }, [strokeCount, redoable, expired, draftTurn, width, height])
+
+  /**
+   * The debounce is a window in which work can be lost, so the two moments a
+   * phone actually takes a tab away close it immediately. `pagehide` rather
+   * than `unload`, which iOS does not reliably fire; `visibilitychange` because
+   * backgrounding is the common case and nothing guarantees a later event.
+   */
+  useEffect(() => {
+    if (expired) return
+    const flush = () => {
+      const s = surfaceRef.current
+      if (s) saveDraft(draftTurn, s.getLayer(), width, height)
+    }
+    const onHidden = () => document.visibilityState === 'hidden' && flush()
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onHidden)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onHidden)
+    }
+  }, [expired, draftTurn, width, height])
 
   useEffect(() => {
     if (!refusal) return

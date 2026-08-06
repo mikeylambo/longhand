@@ -298,6 +298,26 @@ export class Surface {
     this.invalidate()
   }
 
+  /**
+   * Puts a saved draft back on the sheet.
+   *
+   * Not `commit`, which is for marks being made now: this replaces the turn
+   * wholesale rather than appending, and it must never reach the base layer,
+   * which holds the only copy of anybody else's work.
+   *
+   * Refuses once anything has been drawn. Restoring is a thing that happens on
+   * arrival or not at all — a draft landing underneath live strokes would be
+   * the one bug in this area worse than losing the draft.
+   */
+  restoreTurn(strokes: Stroke[]): void {
+    if (strokes.length === 0 || this.turnStrokes.length > 0 || this.drawing) return
+    this.turnStrokes = strokes.slice()
+    this.redoStack = []
+    this.rebuildTurn()
+    this.report()
+    this.invalidate()
+  }
+
   clearTurn(): void {
     this.abortStroke()
     this.turnStrokes = []

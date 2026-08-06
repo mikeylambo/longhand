@@ -9,6 +9,7 @@ import { Review } from './Review'
 import { Welcome, markWelcomed, seenWelcome } from './Welcome'
 import { Invitation } from './Invitation'
 import { peekGift, type GiftPeek } from '../data/ledger'
+import { clearDraft } from '../data/draft'
 import { LEDGER_ENABLED } from '../lib/supabase'
 
 type Phase =
@@ -243,6 +244,10 @@ export function App({ giftToken }: { giftToken?: string } = {}) {
         setSubmitError(null)
         try {
           const next = await session.submit(layer)
+          // Only once it is really in the ledger. Clearing on the tap would
+          // mean a dropped connection took both the save and the only other
+          // copy, which is the failure this draft exists to prevent.
+          clearDraft()
           transition(() => {
             setJustDrawn(layer)
             setCanvas(next)
