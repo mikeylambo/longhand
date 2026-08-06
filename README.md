@@ -202,6 +202,43 @@ format, and the list of formats is data.
 client, so a format added to the table can never reach a player as a bare
 number.
 
+## The mark
+
+A lowercase **f** in the negative space where three painted forms overlap —
+teal, brick red and ochre, with their overlaps darkening as ink does. It is the
+product's own logic rather than an illustration of its name: several hands,
+additive, nothing removing what is under it, in the palette the canvases are
+already drawn in.
+
+`brand/foolscap-mark.svg` is the source and the only place the mark is drawn.
+Every raster is derived from it by `node scripts/icons.mjs`, so none of the
+files in `public/` should ever be edited by hand — if an icon is wrong, the fix
+is in the SVG or the script. Chromium does the rasterising, because it is
+already installed for the tests and it renders SVG the way the browsers showing
+these icons will, which avoids the classic icon bug where a build-time
+rasteriser disagrees with the platform about a path and nobody notices until it
+is on somebody's home screen.
+
+Two sizes are decisions rather than defaults:
+
+- **Maskable is 58% where the others are 80%.** The platform may crop a
+  maskable icon to a circle of 80% diameter, so the mark has to fit inside that
+  *circle*, not the square. The mark is 602×769, so its diagonal is 1.27× its
+  height, which allows 63% — 58% leaves room for the shapes' irregular edges.
+- **The favicon is an SVG first.** The `f` is negative space, and at 16px a
+  raster closes its counters into a smudge while the vector stays open.
+  Verified by rendering both: the 16px PNG loses the letter, the 16px SVG keeps
+  it. The PNGs remain as fallback for anything that will not take an SVG.
+
+The apple-touch icon is opaque on purpose: iOS composites a transparent one
+onto black, which would put the mark in a dark box.
+
+The tab bar keeps its line-drawn glyphs, including the nib for Draw. A
+full-colour mark in one of four slots would be the only coloured thing in the
+row and would read as an advert for itself rather than a label for a
+destination. The mark identifies the app — icon, splash, favicon — and never
+labels a section.
+
 ## Moving around
 
 Four destinations in a bar at the bottom — Draw, Gallery, World, You — with
@@ -1234,12 +1271,6 @@ one thing here I would not promise a shape for until it exists.
 Deliberately not crawler-sniffed: every request for `/c/<id>` gets the same
 document. Serving scrapers something different is cloaking, and it means the
 thing you tested is not the thing that ships.
-
-**A logo.** The splash and the tab both show the name set in the body serif,
-which is a wordmark by default rather than by decision. It wants a real mark —
-something that works at 192px, at 512px maskable, as a favicon, and in one
-colour. The icons in `public/` are placeholders and should be replaced in the
-same pass, since `manifest.webmanifest` already names all three sizes.
 
 A *server-side* render. The export above runs in the player's browser, which is
 fine for someone saving their own canvas but no use for generating an OG preview
