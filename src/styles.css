@@ -1262,3 +1262,41 @@ a.linkbtn.solid {
   padding-top: 16px;
   border-top: 1px solid var(--rule);
 }
+
+/* Two views of the same list. A segmented control rather than a dropdown or a
+   checkbox: there are exactly two, both are worth naming, and which one you
+   are in should be readable without opening anything. */
+.segmented {
+  display: inline-flex;
+  align-self: flex-start;
+  margin: 4px 0 10px;
+  padding: 2px;
+  border: 1px solid var(--rule);
+  border-radius: 999px;
+}
+
+.seg {
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  transition: color 0.16s ease, background-color 0.16s ease;
+}
+
+.seg.on {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* The next page. Centred, because it belongs to the list above it rather than
+   to either edge of the screen. */
+.row.more {
+  margin: 16px 0 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .seg {
+    transition: none;
+  }
+}

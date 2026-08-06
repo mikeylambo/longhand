@@ -299,17 +299,67 @@ export async function fetchCanvasInProgress(): Promise<CanvasRow | null> {
  * URL, their timelapse and their cards, and everyone who drew on one still sees
  * exactly what they saw before. Nothing leaves the ledger.
  */
-export async function fetchClosedCanvases(limit = 40): Promise<CanvasRow[]> {
+export const GALLERY_PAGE = 24
+
+export interface GalleryPage {
+  canvases: CanvasRow[]
+  /** Pass back to get the next page. Null when this was the last one. */
+  cursor: string | null
+}
+
+/**
+ * One page of the archive.
+ *
+ * Keyset rather than offset: the cursor is the `closed_at` of the last card
+ * shown, and the next page is everything older than it. An offset would be
+ * simpler and wrong in a way that only shows up in use — a canvas closing
+ * while somebody is reading shifts every later row down by one, so page two
+ * repeats a card page one already showed, and nothing about that looks like a
+ * bug when you meet it.
+ *
+ * `onlyMine` restricts to the canvases a set of ids names. The caller supplies
+ * them because it already has them for captioning the cards, and because the
+ * alternative — joining through `layers` — makes ordering by the canvas's own
+ * `closed_at` awkward for no gain at this size.
+ *
+ * Two limits worth knowing before this is load-bearing. The cursor is
+ * `closed_at` alone, so two canvases closing in the same microsecond would
+ * lose one across a page boundary — impossible in practice, since closes are
+ * independent transactions, and the fix if it ever matters is a tuple
+ * comparison on (closed_at, id) which PostgREST does not express cleanly. And
+ * `onlyMine` sends the id set as an `in` list, which is fine for somebody with
+ * hundreds of canvases and would want rethinking at thousands.
+ */
+export async function fetchClosedCanvases(
+  opts: { cursor?: string | null; limit?: number; onlyMine?: Set<string> } = {},
+): Promise<GalleryPage> {
+  const limit = opts.limit ?? GALLERY_PAGE
   const db = requireSupabase()
-  const { data, error } = await db
+
+  let q = db
     .from('canvases')
     .select('*')
     .eq('status', 'closed')
     .eq('listed', true)
     .order('closed_at', { ascending: false })
-    .limit(limit)
+    // One more than asked for, so "is there another page" is a fact rather
+    // than a guess from a full-looking one.
+    .limit(limit + 1)
+
+  if (opts.cursor) q = q.lt('closed_at', opts.cursor)
+  if (opts.onlyMine) {
+    if (opts.onlyMine.size === 0) return { canvases: [], cursor: null }
+    q = q.in('id', [...opts.onlyMine])
+  }
+
+  const { data, error } = await q
   if (error) throw new Error(`could not load the gallery: ${error.message}`)
-  return (data ?? []) as CanvasRow[]
+
+  const rows = (data ?? []) as CanvasRow[]
+  const more = rows.length > limit
+  const canvases = more ? rows.slice(0, limit) : rows
+  const last = canvases[canvases.length - 1]
+  return { canvases, cursor: more && last ? last.closed_at : null }
 }
 
 export interface GiftPeek {

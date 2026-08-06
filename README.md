@@ -16,10 +16,17 @@ npm install
 npm run dev
 ```
 
-Deployed for phone testing at **https://longhand-kappa.vercel.app**. The name
-is **Foolscap** and the domain is **foolscap.ink**; the Vercel URL is where it
-answers until that is pointed at it. Storage keys are still `longhand.*` on
-purpose — see *Known gaps*.
+Live at **https://www.foolscap.ink**. The apex 308-redirects to `www`, so
+there is one origin rather than two — which matters more than which one won,
+because identity, push subscriptions and the service worker are all scoped to
+the origin and a split would quietly halve every returning visitor.
+
+`longhand-kappa.vercel.app` still answers and is a third origin. Anyone who
+drew there before the domain existed is a stranger on `www.foolscap.ink`, and
+that is the expected, one-time cost of moving; it was paid at zero push
+subscriptions. Share only the canonical host from here.
+
+Storage keys are still `longhand.*` on purpose — see *Known gaps*.
 
 The repository, the Supabase project and the Vercel project all still read
 `longhand`. None of them is user-visible and renaming any of them costs more
@@ -120,7 +127,10 @@ double-booked and nothing is reserved forever:
 **The close.** The last slot submits, the canvas flips to `closed`, and it gets
 a shareable page at `/c/<id>` with the full piece, the scrubbable timelapse,
 every contributor's layer alone, and PNG downloads. `/gallery` lists finished
-work, newest first — no counts, no ranking, no leaderboard, ever.
+work, newest first — no counts, no ranking, no leaderboard, ever. It pages
+with a keyset cursor rather than an offset, and filters to the canvases your
+mark is on: still the same list in the same order, because "yours" is a
+navigation problem and not a reason to start scoring anything.
 
 **The first visit** — one screen, once, led by a six-second clip of a finished
 canvas assembling itself. See *The first thing a stranger sees* below.
@@ -1224,13 +1234,6 @@ one thing here I would not promise a shape for until it exists.
 Deliberately not crawler-sniffed: every request for `/c/<id>` gets the same
 document. Serving scrapers something different is cloaking, and it means the
 thing you tested is not the thing that ships.
-
-**A gallery worth living in.** It is a flat list of everything, newest first,
-with the canvases your mark is on captioned *yours*. That is enough to find
-your own work and it is deliberately not a ranking — no counts, no order that
-favours you. What it does not yet have is any way to move through a long
-archive: no paging past the newest forty, no way to see only the ones you were
-on. Both become real the first time there are more canvases than a screen.
 
 **A logo.** The splash and the tab both show the name set in the body serif,
 which is a wordmark by default rather than by decision. It wants a real mark —

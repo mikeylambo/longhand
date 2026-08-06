@@ -32,10 +32,13 @@ export function ScreenPage() {
       setError('This build has no ledger, so there is nothing to show.')
       return
     }
-    fetchClosedCanvases(60)
-      .then((rows) => {
-        if (rows.length === 0) setError('Nothing has finished yet.')
-        setQueue(rows)
+    // The wall takes one batch and cycles it. Deliberately not paged: this
+    // runs unattended on a display in a room, and something that quietly grew
+    // its own memory all evening would be the wrong kind of clever.
+    fetchClosedCanvases({ limit: 60 })
+      .then(({ canvases }) => {
+        if (canvases.length === 0) setError('Nothing has finished yet.')
+        setQueue(canvases)
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
   }, [])
