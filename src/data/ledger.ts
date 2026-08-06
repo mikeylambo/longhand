@@ -468,6 +468,33 @@ export async function fetchHandCanvases(
 }
 
 /**
+ * Just the ids of the canvases this browser's mark is on.
+ *
+ * `fetchHandCanvases` answers the same question but decodes every stroke of
+ * every layer to do it, which is right for a hand's page and absurd for
+ * putting a word on a gallery card. This is the id column and nothing else.
+ *
+ * Returns an empty set rather than throwing when there is no mark yet or the
+ * query fails: a gallery that will not render because it could not work out
+ * which canvases were yours is a worse gallery than one that does not say.
+ */
+export async function myCanvasIds(): Promise<Set<string>> {
+  const signatureId = cachedSignatureId()
+  if (!signatureId) return new Set()
+  try {
+    const db = requireSupabase()
+    const { data, error } = await db
+      .from('layers')
+      .select('canvas_id')
+      .eq('signature_id', signatureId)
+    if (error) return new Set()
+    return new Set(((data ?? []) as { canvas_id: string }[]).map((r) => r.canvas_id))
+  } catch {
+    return new Set()
+  }
+}
+
+/**
  * Which canvases two hands have both been on.
  *
  * The most emotionally distinctive thing available here, and it is a set

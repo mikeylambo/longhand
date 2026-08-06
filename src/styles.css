@@ -593,6 +593,73 @@ button {
   border-bottom-color: var(--rule);
 }
 
+/* Sits under the tab bar, so it needs less air above it than it did when it
+   was the whole of the bottom of the screen. */
+.footer.under-tabs {
+  margin-top: 10px;
+  justify-content: center;
+}
+
+/* ------------------------------------------------------------------ tabs */
+
+/* Where you can go. A real row of controls at thumb height rather than a line
+   of small grey links, which is most of the difference between reading as an
+   app and reading as a page.
+
+   Not fixed to the viewport: `.panel` is already a full-height flex column, so
+   the bar sits at the end of it and scrolling content stays between the
+   heading and the bar rather than sliding under it. A fixed bar would need
+   every screen to reserve space for it, and the one screen that forgot would
+   hide its own last line. */
+.tabbar {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  margin-top: 16px;
+  padding-top: 10px;
+  border-top: 1px solid var(--rule);
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 2px 2px;
+  /* Comfortably past the 44px a thumb wants, without the bar becoming
+     furniture in its own right. */
+  min-height: 46px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  transition: color 0.16s ease, background-color 0.16s ease;
+}
+
+.tab span {
+  line-height: 1;
+}
+
+/* Where you are: the ink colour and a wash behind it. Colour alone would be
+   the only signal, and on this palette the muted grey and the ink are not far
+   enough apart to carry it by themselves in daylight. */
+.tab.on {
+  color: var(--ink);
+  background: var(--chrome-2);
+}
+
+.tab:active {
+  background: var(--chrome-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab {
+    transition: none;
+  }
+}
+
 /* Where you already are. Marked rather than dropped from the row, so the set
    of places is the same on every screen and a screen reader can say which one
    is current. Darker than the links around it and not underlinable, which is
@@ -1169,4 +1236,17 @@ a.linkbtn.solid {
   padding: 5px 10px;
   font-size: 15px;
   letter-spacing: 0.18em;
+}
+
+/* A canvas you were on. The ink colour against the muted caption around it,
+   which is enough on this palette without a badge or a colour that would be
+   the only bright thing on the screen. */
+.yours {
+  color: var(--ink);
+}
+
+/* The larger formats, offered apart from the ordinary three. */
+.chooser.quiet {
+  margin-top: 2px;
+  opacity: 0.72;
 }

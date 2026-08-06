@@ -141,17 +141,34 @@ export function Review({ canvas, layer, signature, mode, onNext }: Props) {
       </div>
 
       {mode === 'ledger' && (
-        <p className="chooser">
-          or ask for{' '}
-          {FORMATS.map((f, i) => (
-            <span key={f.slots}>
-              {i > 0 && ' · '}
-              <button className="asif" onClick={() => onNext(f.slots)}>
-                {f.name}
-              </button>
-            </span>
-          ))}
-        </p>
+        <>
+          <p className="chooser">
+            or ask for{' '}
+            {FORMATS.filter((f) => !f.onRequest).map((f, i) => (
+              <span key={f.slots}>
+                {i > 0 && ' · '}
+                <button className="asif" onClick={() => onNext(f.slots)}>
+                  {f.name}
+                </button>
+              </span>
+            ))}
+          </p>
+          {/* On their own line because the rotation never opens one and
+              because a hundred hands is a different proposition from two —
+              it will be open for a long time, which is the appeal and also
+              the thing not to bury in a row of ordinary choices. */}
+          <p className="chooser quiet">
+            something longer, which will take a while to fill:{' '}
+            {FORMATS.filter((f) => f.onRequest).map((f, i) => (
+              <span key={f.slots}>
+                {i > 0 && ' · '}
+                <button className="asif" onClick={() => onNext(f.slots)}>
+                  {f.name}
+                </button>
+              </span>
+            ))}
+          </p>
+        </>
       )}
 
       <Footer wander={mode === 'ledger'} />

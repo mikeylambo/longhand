@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react'
-import { flushSync } from 'react-dom'
 import type { Stroke } from '../engine/types'
 import { createSession, type CanvasState } from '../data/session'
 import { loadSignature, type StoredSignature } from '../store'
@@ -10,6 +9,7 @@ import { Welcome, markWelcomed, seenWelcome } from './Welcome'
 import { Invitation } from './Invitation'
 import { peekGift, type GiftPeek } from '../data/ledger'
 import { clearDraft } from '../data/draft'
+import { transition } from './transition'
 import { LEDGER_ENABLED } from '../lib/supabase'
 
 type Phase =
@@ -23,27 +23,6 @@ type Phase =
 
 const message = (e: unknown) =>
   e instanceof Error ? e.message : 'something went wrong'
-
-/**
- * Screen changes crossfade instead of cutting.
- *
- * flushSync is required: startViewTransition snapshots the DOM, runs the
- * callback, then snapshots again, so React has to commit synchronously inside
- * it or the transition captures the same frame twice and does nothing.
- * Browsers without the API just get the old hard cut.
- */
-type WithVT = Document & {
-  startViewTransition?: (cb: () => void) => { finished: Promise<void> }
-}
-
-function transition(update: () => void): void {
-  const d = document as WithVT
-  if (!d.startViewTransition || matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    update()
-    return
-  }
-  d.startViewTransition(() => flushSync(update))
-}
 
 export function App({ giftToken }: { giftToken?: string } = {}) {
   const [session] = useState(createSession)

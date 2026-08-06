@@ -121,16 +121,10 @@ export function WorldPage() {
         )}
       </div>
 
-      <div className="row">
-        <a className="linkbtn" href="/gallery">
-          The gallery
-        </a>
-        <div className="spacer" />
-        <a className="linkbtn solid" href="/">
-          Take a slot
-        </a>
-      </div>
-
+      {/* The gallery link and "Take a slot" both used to live here, because
+          the old footer dropped its destinations on exactly this screen. The
+          tab bar carries them now, and a pill that duplicates a tab two
+          centimetres below it is furniture. */}
       <Footer wander />
     </div>
   )

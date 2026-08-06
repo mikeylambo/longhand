@@ -192,6 +192,34 @@ format, and the list of formats is data.
 client, so a format added to the table can never reach a player as a bare
 number.
 
+## Moving around
+
+Four destinations in a bar at the bottom — Draw, Gallery, World, You — with
+the current one lit. Terms and safety sit under it, small and grey, because
+they are promises rather than places and a parent who has never drawn anything
+still has to be able to find the second one.
+
+This replaced a single row of small grey links, which is how a website ends a
+page, and it read like one.
+
+**Navigation no longer reloads the document.** It used to, deliberately, on the
+grounds that every route here is somewhere you arrive at from outside — a
+shared link, a notification. That is true of *arriving* and wrong about moving
+around, and it only became wrong once the product was meant to hold somebody
+for an hour: every tap threw away the bundle, remounted React and re-booted the
+session. It also replayed the launch splash on every screen change, which on
+the fourth tap in a minute reads as broken rather than as opening.
+
+`src/ui/Router.tsx` is about eighty lines and no dependency. The URLs are
+unchanged and still real, the markup is still plain anchors, and arriving from
+outside still loads that route directly — a shared `/c/<id>` behaves exactly as
+it did, and so does a browser with no JavaScript. All it adds is: when the app
+is already running, do not throw it away to move one screen. Section changes
+use the same view-transition crossfade the phases of a turn use.
+
+Links to another origin, new tabs, downloads and modified clicks are left to
+the browser, and there is a test that asserts the router does not swallow them.
+
 ## The first thing a stranger sees
 
 One screen, once, and the clip does the teaching. A finished canvas assembling
@@ -1168,6 +1196,13 @@ node scripts/make-welcome.mjs    # regenerates public/welcome-canvas.json
 ```
 
 ## Not built yet
+
+**A gallery worth living in.** It is a flat list of everything, newest first,
+with the canvases your mark is on captioned *yours*. That is enough to find
+your own work and it is deliberately not a ranking — no counts, no order that
+favours you. What it does not yet have is any way to move through a long
+archive: no paging past the newest forty, no way to see only the ones you were
+on. Both become real the first time there are more canvases than a screen.
 
 **A logo.** The splash and the tab both show the name set in the body serif,
 which is a wordmark by default rather than by decision. It wants a real mark —

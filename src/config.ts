@@ -32,17 +32,27 @@ export const TURN_MS = 10 * 60 * 1000
  * only how the sizes are *spoken*, which belongs next to the rest of the copy.
  * tests/ledger.spec.ts asserts every format in the table has a name here.
  */
-export const FORMATS = [
+export const FORMATS: readonly Format[] = [
   { slots: 2, name: 'a duo', title: 'Duo', hands: 'two' },
   { slots: 4, name: 'a quartet', title: 'Quartet', hands: 'four' },
   { slots: 12, name: 'twelve hands', title: 'Twelve hands', hands: 'twelve' },
-] as const
+  // Weight 0 in `canvas_formats`: the rotation never opens one, so these exist
+  // only for somebody who asks. They were in the table from 0019 and named
+  // nowhere, which meant a 24-hand canvas rendered as "24 hands" in the
+  // gallery and could not be asked for at all — built, and unreachable.
+  { slots: 24, name: 'a classroom', title: 'Classroom', hands: 'twenty-four', onRequest: true },
+  { slots: 100, name: 'a marathon', title: 'Marathon', hands: 'a hundred', onRequest: true },
+]
 
 export interface Format {
   slots: number
   name: string
   title: string
   hands: string
+  /** Never opened by the rotation. Offered apart from the rest, because
+   *  a hundred hands is a different kind of commitment from two and should
+   *  not sit in the same row as if it were the same choice. */
+  onRequest?: boolean
 }
 
 /**

@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react'
 import { renderLayers } from '../engine/render'
 import { CANVAS_H, CANVAS_W, formatFor } from '../config'
-import { fetchClosedCanvases, fetchLayers, type CanvasRow } from '../data/ledger'
+import {
+  fetchClosedCanvases,
+  fetchLayers,
+  myCanvasIds,
+  type CanvasRow,
+} from '../data/ledger'
 import { LEDGER_ENABLED } from '../lib/supabase'
 import { Footer } from './Footer'
 
@@ -12,6 +17,7 @@ import { Footer } from './Footer'
  */
 export function Gallery() {
   const [canvases, setCanvases] = useState<CanvasRow[] | null>(null)
+  const [mine, setMine] = useState<Set<string>>(() => new Set())
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -22,6 +28,9 @@ export function Gallery() {
     fetchClosedCanvases()
       .then(setCanvases)
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+    // Separately, and allowed to lose. The archive is the point of this screen
+    // and it should not wait on a question about the person looking at it.
+    void myCanvasIds().then(setMine)
   }, [])
 
   return (
@@ -43,24 +52,18 @@ export function Gallery() {
         )}
         <div className="cards">
           {canvases?.map((c) => (
-            <GalleryCard key={c.id} canvas={c} />
+            <GalleryCard key={c.id} canvas={c} mine={mine.has(c.id)} />
           ))}
         </div>
       </div>
 
-      <div className="row">
-        <div className="spacer" />
-        <a className="linkbtn solid" href="/">
-          Take a slot
-        </a>
-      </div>
-
+      {/* "Take a slot" was here; it is the Draw tab now. */}
       <Footer wander />
     </div>
   )
 }
 
-function GalleryCard({ canvas }: { canvas: CanvasRow }) {
+function GalleryCard({ canvas, mine }: { canvas: CanvasRow; mine: boolean }) {
   const [src, setSrc] = useState<string | null>(null)
 
   useEffect(() => {
@@ -92,7 +95,14 @@ function GalleryCard({ canvas }: { canvas: CanvasRow }) {
       )}
       <figcaption>
         <span className="seed-small">“{canvas.seed_word}”</span>
-        <span>{formatFor(canvas.slot_count).title}</span>
+        <span>
+          {formatFor(canvas.slot_count).title}
+          {/* Stated rather than counted. Somebody who has drawn for hours
+              wants to find the ones they were on, and the alternative — a
+              number of them, or an order that favours them — would be the
+              ranking this archive has never had. */}
+          {mine && <span className="yours"> · yours</span>}
+        </span>
       </figcaption>
     </a>
   )
