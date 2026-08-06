@@ -20,6 +20,35 @@
 -- profile, or anything that could be used to find a person. A signature is
 -- still a drawn mark. This only makes the mark portable.
 
+-- ------------------------------------------------- where pgcrypto actually is
+--
+-- The recovery key is hashed with `digest` and generated with
+-- `gen_random_bytes`, both of which are pgcrypto rather than core. 0001 asks
+-- for pgcrypto with no schema, so on a bare PostgreSQL it lands in `public`
+-- and everything below resolves. On Supabase pgcrypto is already installed
+-- into `extensions` before the first migration runs, `if not exists` is a
+-- no-op, and a function pinned to `set search_path = public` cannot see it.
+--
+-- That difference is invisible until somebody taps "get a recovery key" and
+-- gets `function digest(unknown, unknown) does not exist` — the migration
+-- applies perfectly, because plpgsql does not resolve function names in a body
+-- until it runs one. So the two functions that need pgcrypto name both schemas,
+-- and this block fails the migration now rather than failing a person later.
+do $$
+declare
+  path constant text := 'public, extensions';
+  was  text := current_setting('search_path');
+begin
+  perform set_config('search_path', path, true);
+  if to_regprocedure('digest(text, text)') is null then
+    raise exception 'pgcrypto''s digest() is not reachable from "%" — a recovery key could not be hashed', path;
+  end if;
+  if to_regprocedure('gen_random_bytes(integer)') is null then
+    raise exception 'pgcrypto''s gen_random_bytes() is not reachable from "%" — a recovery key could not be minted', path;
+  end if;
+  perform set_config('search_path', was, true);
+end $$;
+
 -- --------------------------------------------------------------- the device set
 
 create table if not exists public.signature_devices (
@@ -128,7 +157,10 @@ create or replace function public.mint_recovery_key(
 returns text
 language plpgsql
 security definer
-set search_path = public
+-- `extensions` because that is where Supabase keeps pgcrypto; see the check at
+-- the top of this file. Harmless on a bare PostgreSQL, where the schema does
+-- not exist and a search_path entry naming a missing schema is simply skipped.
+set search_path = public, extensions
 as $$
 declare
   raw text;
@@ -166,7 +198,7 @@ create or replace function public.redeem_recovery_key(
 returns uuid
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions   -- pgcrypto's digest(); see the top of this file
 as $$
 declare
   sig uuid;

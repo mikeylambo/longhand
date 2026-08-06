@@ -35,18 +35,6 @@ create table if not exists public.ink_sets (
   retired     boolean not null default false
 );
 
-insert into public.ink_sets (id, name, colours, price_pence) values
-  ('house', 'The house set',
-   (select jsonb_agg(hex order by base_idx) from public.palette_colors where step = 0), 0),
-  ('nightfall', 'Nightfall',
-   '["#1B1A17","#2B3A72","#3B6288","#6A4B82","#A94578","#E3A59C"]'::jsonb, 0),
-  ('orchard', 'Orchard',
-   '["#7C8A47","#48764F","#B8873C","#E5A23C","#A73A34","#F2EDE3"]'::jsonb, 0),
-  ('low-tide', 'Low tide',
-   '["#2C7A73","#3B6288","#9C978B","#FBF8F1","#5B5850","#E3A59C"]'::jsonb, 0)
-on conflict (id) do update
-  set name = excluded.name, colours = excluded.colours;
-
 alter table public.ink_sets enable row level security;
 drop policy if exists ink_sets_read on public.ink_sets;
 create policy ink_sets_read on public.ink_sets
@@ -91,6 +79,24 @@ create trigger ink_sets_are_cosmetic_trg
   for each row execute function public.ink_sets_are_cosmetic();
 
 revoke execute on function public.ink_sets_are_cosmetic() from public, anon, authenticated;
+
+-- The seeds go in *after* the trigger, so the house sets are checked by the
+-- rule they exist to demonstrate. Ordering it the other way round is how the
+-- first version of this shipped `#F2EDE3` in Orchard — an off-white close
+-- enough to the palette's own `#FBF8F1` to read as a typo, which is exactly
+-- the kind of thing the check is for. A seed that skips the check is a rule
+-- with an exception carved into the same file that states it.
+insert into public.ink_sets (id, name, colours, price_pence) values
+  ('house', 'The house set',
+   (select jsonb_agg(hex order by base_idx) from public.palette_colors where step = 0), 0),
+  ('nightfall', 'Nightfall',
+   '["#1B1A17","#2B3A72","#3B6288","#6A4B82","#A94578","#E3A59C"]'::jsonb, 0),
+  ('orchard', 'Orchard',
+   '["#7C8A47","#48764F","#B8873C","#E5A23C","#A73A34","#FBF8F1"]'::jsonb, 0),
+  ('low-tide', 'Low tide',
+   '["#2C7A73","#3B6288","#9C978B","#FBF8F1","#5B5850","#E3A59C"]'::jsonb, 0)
+on conflict (id) do update
+  set name = excluded.name, colours = excluded.colours;
 
 create table if not exists public.ink_entitlements (
   signature_id uuid not null references public.signatures (id) on delete restrict,

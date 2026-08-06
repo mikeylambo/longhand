@@ -28,7 +28,9 @@
 
 /** The floor a single mark costs, matching MARK_FLOOR in src/engine/tools.ts. */
 create or replace function public.mark_floor()
-returns numeric language sql immutable as $$ select 18::numeric $$;
+returns numeric language sql immutable
+set search_path = public   -- pinned like every other function here; see 0029
+as $$ select 18::numeric $$;
 
 /**
  * Ink for a layer, recomputed from the geometry.

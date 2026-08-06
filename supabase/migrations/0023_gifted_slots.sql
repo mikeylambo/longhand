@@ -61,7 +61,9 @@ create or replace function public.gift_slot(
 returns jsonb
 language plpgsql
 security definer
-set search_path = public
+-- `extensions` for pgcrypto's gen_random_bytes(), which mints the token. See
+-- the note at the top of 0021: on Supabase pgcrypto is not in `public`.
+set search_path = public, extensions
 as $$
 declare
   c   public.canvases;

@@ -14,10 +14,20 @@
 -- Until it is called, nothing sends and nothing breaks. The queue is a table
 -- precisely so that a sender which does not exist yet costs nothing but delay.
 
--- No `with schema`: pg_net brings its own `net` schema and refuses to be put
--- anywhere else, so naming one is how this fails on the first deploy rather
--- than on the first canvas that closes.
-create extension if not exists pg_net;
+-- pg_net puts every function and table it owns in its own `net` schema no
+-- matter what is asked for, and it is not relocatable. What `with schema` sets
+-- is only the bookkeeping — which schema the extension is *recorded* against —
+-- and that still matters: left unnamed it records against whatever is first on
+-- the search_path, which on Supabase is `public`, and an extension recorded in
+-- `public` is a standing security-lint finding for something with no objects
+-- there at all. Naming `extensions` matches where Supabase itself installs
+-- pgcrypto, and costs nothing.
+--
+-- (An earlier version of this comment claimed pg_net "refuses to be put
+-- anywhere else" and left the clause off. Half right: the objects refuse, the
+-- bookkeeping does not.)
+create schema if not exists extensions;
+create extension if not exists pg_net with schema extensions;
 
 /**
  * Schedules — or reschedules — the minute-by-minute poke.
