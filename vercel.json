@@ -1,13 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
+    { "source": "/c/:id", "destination": "/api/canvas" },
     {
-      "comment": "A shared canvas gets its meta tags filled in before the shell is served. First, because rewrites are ordered and the catch-all below would otherwise swallow it.",
-      "source": "/c/:id",
-      "destination": "/api/canvas"
-    },
-    {
-      "comment": "Everything else is the SPA. index.html and api/ are excluded so that /api/canvas can fetch the unrewritten shell without matching itself.",
       "source": "/((?!api/|assets/|index.html|manifest.webmanifest|favicon.ico|welcome-canvas.json).*)",
       "destination": "/index.html"
     }

@@ -21,6 +21,16 @@
  * held here as a template, so it cannot drift from what the build produced —
  * a copy of the head in this file would be wrong the first time a script tag
  * changed and nobody would notice until sharing broke.
+ *
+ * Two things in `vercel.json` make this work, and neither can carry a comment
+ * because JSON has none — the first attempt put `"comment"` keys in the
+ * rewrite objects and the deployment failed schema validation before the build
+ * even started, which produces an ERROR state and no build log at all:
+ *
+ *   - `/c/:id` rewrites here, and is listed *first*, because rewrites are
+ *     ordered and the SPA catch-all below it would otherwise swallow it.
+ *   - the catch-all excludes `api/` and `index.html`, so the fetch above gets
+ *     the real shell rather than being rewritten back into this function.
  */
 
 export const config = { runtime: 'edge' }
