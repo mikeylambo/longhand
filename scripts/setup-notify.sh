@@ -24,6 +24,20 @@
 # rather than passed as an argument — argv is visible to anything that can run
 # `ps` on this machine.
 #
+# Two of the steps are SQL against the remote database: scheduling the poke and
+# reporting health. The Supabase CLI has no command for running SQL — `db push`
+# applies migrations, `db dump` reads, `db diff`/`lint`/`pull`/`reset` are the
+# rest, and that is all of it. (An earlier version of this script called
+# `supabase db execute`, which has never existed. It failed at the *last* step,
+# after the secrets were stored and the sender deployed, and blamed the project
+# link for it.) So SQL goes over psql when a connection string is available:
+#
+#   export SUPABASE_DB_URL='postgresql://…'   # Settings → Database → URI
+#
+# Without one the statement is printed to paste into the dashboard's SQL
+# editor. Each is a single line, and a step that hands you the line is better
+# than a step that dies holding it.
+#
 set -Eeuo pipefail
 
 SUPABASE="${SUPABASE:-supabase}"
@@ -32,9 +46,14 @@ die() { printf '\n%s\n' "FAILED: $*" >&2; exit 1; }
 
 MODE="${1:-setup}"
 
-command -v "$SUPABASE" >/dev/null \
-  || die "the supabase CLI is not installed (brew install supabase/tap/supabase)."
-command -v node >/dev/null || die "node is not installed."
+# Only setup needs the CLI and node — the keypair, the secrets and the deploy.
+# --status and --off are SQL alone, and asking for a CLI to read a health count
+# would be a reason not to check.
+if [[ "$MODE" == "setup" ]]; then
+  command -v "$SUPABASE" >/dev/null \
+    || die "the supabase CLI is not installed (brew install supabase/tap/supabase)."
+  command -v node >/dev/null || die "node is not installed."
+fi
 
 REF="${SUPABASE_PROJECT_REF:-}"
 if [[ -z "$REF" ]]; then
@@ -46,9 +65,29 @@ FN_URL="https://${REF}.supabase.co/functions/v1/notify"
 
 # ------------------------------------------------------------------ status
 
-sql() { # <sql> — run as the service role via the CLI's db connection
-  "$SUPABASE" --project-ref "$REF" db execute --stdin <<<"$1" 2>/dev/null \
-    || die "could not reach the database. Is the project linked? \`supabase link --project-ref $REF\`"
+# Set by sql() to whether the last statement actually ran, so nothing below
+# reports as done what it has really only handed over.
+SQL_RAN=0
+
+sql() { # <sql> [what it does] — over psql, or printed to paste
+  if [[ -n "${SUPABASE_DB_URL:-}" ]] && command -v psql >/dev/null; then
+    psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -qAtX -c "$1" \
+      || die "that statement failed against the database."
+    SQL_RAN=1
+    return
+  fi
+  SQL_RAN=0
+  # Deliberately not a failure. The caller is mid-setup and the alternative is
+  # stopping with the work half done.
+  say ""
+  say "Run this in the SQL editor — Dashboard → SQL Editor → New query:"
+  say ""
+  printf '  %s\n' "$1"
+  say ""
+  # Only wait when something after this depends on it having run.
+  if [[ -n "${2:-}" && -t 0 ]]; then
+    read -r -p "Press return once $2. " _
+  fi
 }
 
 if [[ "$MODE" == "--status" ]]; then
@@ -60,8 +99,14 @@ fi
 
 if [[ "$MODE" == "--off" ]]; then
   sql "select public.unschedule_notify();"
-  say "Stopped. The queue keeps filling and nothing is lost — turn it back on"
-  say "and everyone gets the one notification that is still true."
+  if (( SQL_RAN )); then
+    say "Stopped. The queue keeps filling and nothing is lost — turn it back on"
+    say "and everyone gets the one notification that is still true."
+  else
+    say "Once that has run the sender is stopped. The queue keeps filling and"
+    say "nothing is lost — turn it back on and everyone gets the one"
+    say "notification that is still true."
+  fi
   exit 0
 fi
 
@@ -131,13 +176,25 @@ OPEN="$(curl -s -o /dev/null -w '%{http_code}' -X POST "$FN_URL" \
        an endpoint anybody can poke."
 
 say "Scheduling it…"
-sql "select public.schedule_notify('${FN_URL}', '${NOTIFY_SECRET}');"
+# This is the one statement with a secret in it. Over psql it never leaves the
+# process; pasted, it is on screen for as long as the paste takes. That is the
+# cost of not having a CLI that runs SQL, and it is why SUPABASE_DB_URL is
+# worth setting.
+sql "select public.schedule_notify('${FN_URL}', '${NOTIFY_SECRET}');" \
+    "it has run and returned a job id"
 
 # ------------------------------------------------------------- the client
 
-cat <<EOF
+if (( SQL_RAN )); then
+  say ""
+  say "Done. The sender runs every minute and the queue is draining."
+else
+  say ""
+  say "Secrets stored and the sender deployed and proved. It starts running"
+  say "every minute once that last statement has gone through."
+fi
 
-Done. The sender runs every minute and the queue is draining.
+cat <<EOF
 
 One thing left, and it has to be you because it is a deploy: the client needs
 the public half of the keypair to subscribe a browser at all. Set this in

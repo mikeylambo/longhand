@@ -122,13 +122,38 @@ accounts, which is a different product.
 
 ## 2. Notifications
 
+The sender is **deployed** — `notify`, version 1, `verify_jwt` off — and has
+been proved to refuse an unauthenticated caller: called from the database with
+no `x-notify-secret` it answers `404 not found`, which is what it should tell
+anyone who does not have the secret. It is not scheduled and it has no secrets
+yet, so it sends nothing. That is a safe state, not a broken one: without the
+VAPID keys it returns 503 and the queue keeps its rows.
+
+`verify_jwt` is off because pg_cron calls it with no user session. The header
+is what actually guards it.
+
+What is left needs the CLI or the dashboard, because storing function secrets
+is the one step that cannot go through the route §1 used:
+
 ```bash
+export SUPABASE_DB_URL='postgresql://…'   # Settings → Database → URI
 scripts/setup-notify.sh
 ```
 
-Generates the VAPID keypair and the shared secret, stores them, deploys the
+Generates the VAPID keypair and the shared secret, stores them, redeploys the
 sender, proves the endpoint answers with the secret and 404s without it, and
 only then schedules the minute-by-minute poke. It prints the public key.
+
+`SUPABASE_DB_URL` is optional. Without it the script prints its two SQL
+statements for the dashboard's SQL editor instead of running them — which is
+worth knowing about, because the scheduling statement carries the shared
+secret, and over psql that value never leaves the process.
+
+> The Supabase CLI has no command that runs SQL. `db push` applies migrations,
+> `db dump` reads, and `diff`/`lint`/`pull`/`reset` are the rest. This script
+> used to call `supabase db execute`, which has never existed — it would have
+> failed at the last step, after the secrets were stored and the sender
+> deployed, and blamed the project link for it.
 
 ## 3. The client
 
@@ -189,22 +214,29 @@ runs wherever the migration runs.
 
 ## What is still outstanding
 
-**Notifications are not on.** The sender is not deployed and nothing is
-scheduled — `notify_health()` reports `scheduled: false`, 0 pending, 0
-subscriptions. Nothing is lost while it is off; that is what the queue is for,
-and it is empty because no canvas has closed since the deploy.
+**Notifications are deployed but not sending.** The sender is up (§2) and
+nothing is scheduled — `notify_health()` reports `scheduled: false`, 0 pending,
+0 subscriptions. Nothing is lost while it is off; that is what the queue is
+for, and it is empty because no canvas has closed since the deploy.
 
-Turning it on is `scripts/setup-notify.sh`, and it needs two things this
-session could not supply:
+Two things are still needed, and both are decisions or credentials rather than
+code:
 
-- **The function secrets.** The VAPID keypair and the shared secret are set
-  with `supabase secrets set`. There is no management-API equivalent exposed
-  here, so this step needs the CLI or the dashboard — it is the one part of the
-  deploy that cannot go through the API route described in §1.
+- **The function secrets.** The VAPID keypair and the shared secret. The
+  management API *does* have an endpoint for these — `POST
+  /v1/projects/{ref}/secrets` — so an earlier note here saying there was no
+  equivalent was wrong. What is true is narrower: it needs a personal access
+  token, and the deploy session had none and could not reach `api.supabase.com`
+  or `*.supabase.co` at all. Hence the CLI or the dashboard.
 - **A subject address.** VAPID publishes a contact in every push request, for a
   push service to complain to when a project floods it. It should be an address
   meant to be public, which makes it a decision rather than a value that can be
   derived.
+
+The keypair is best generated wherever it is going to be stored. It is a
+signing key, and the fewer places it passes through the better —
+`scripts/setup-notify.sh` generates it, pipes it straight into `secrets set`,
+and never writes it down.
 
 Then `VITE_VAPID_PUBLIC_KEY` goes into Vercel and the client redeploys. Until
 it does, `/mark` says the build has no push behind it, which is true.
