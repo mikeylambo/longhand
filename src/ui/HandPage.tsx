@@ -132,7 +132,7 @@ export function HandPage({ signatureId }: { signatureId: string }) {
         </a>
       </div>
 
-      <Footer gallery />
+      <Footer wander />
     </div>
   )
 }

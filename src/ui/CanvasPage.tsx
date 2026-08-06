@@ -281,7 +281,7 @@ export function CanvasPage({ canvasId }: Props) {
         </a>
       </div>
 
-      <Footer gallery />
+      <Footer wander />
     </div>
   )
 }

@@ -136,7 +136,7 @@ export function ArPage({ canvasId }: { canvasId: string }) {
         </a>
       </div>
 
-      <Footer gallery />
+      <Footer wander />
     </div>
   )
 }

@@ -131,7 +131,7 @@ export function WorldPage() {
         </a>
       </div>
 
-      <Footer />
+      <Footer wander />
     </div>
   )
 }

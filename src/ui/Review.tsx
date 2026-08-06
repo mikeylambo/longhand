@@ -154,7 +154,7 @@ export function Review({ canvas, layer, signature, mode, onNext }: Props) {
         </p>
       )}
 
-      <Footer gallery={mode === 'ledger'} />
+      <Footer wander={mode === 'ledger'} />
     </div>
   )
 }

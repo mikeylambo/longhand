@@ -55,7 +55,7 @@ export function Gallery() {
         </a>
       </div>
 
-      <Footer />
+      <Footer wander />
     </div>
   )
 }

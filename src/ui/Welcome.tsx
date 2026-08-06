@@ -97,7 +97,7 @@ export function Welcome({ onStart }: Props) {
         </button>
       </div>
 
-      <Footer gallery />
+      <Footer wander />
     </div>
   )
 }

@@ -183,7 +183,7 @@ export function ClassPage() {
         </a>
       </div>
 
-      <Footer gallery />
+      <Footer wander />
     </div>
   )
 }

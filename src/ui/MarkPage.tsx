@@ -291,7 +291,7 @@ export function MarkPage() {
         </a>
       </div>
 
-      <Footer gallery />
+      <Footer wander />
     </div>
   )
 }

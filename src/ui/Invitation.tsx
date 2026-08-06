@@ -69,7 +69,7 @@ export function Invitation({
         </button>
       </div>
 
-      <Footer gallery />
+      <Footer wander />
     </div>
   )
 }

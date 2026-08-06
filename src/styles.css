@@ -593,6 +593,16 @@ button {
   border-bottom-color: var(--rule);
 }
 
+/* Where you already are. Marked rather than dropped from the row, so the set
+   of places is the same on every screen and a screen reader can say which one
+   is current. Darker than the links around it and not underlinable, which is
+   the quietest way to say "not a destination" without moving anything. */
+.footer-here {
+  color: var(--ink);
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* ---------------------------------------------------------------- welcome */
 
 /* The clip leads, so it sits above the heading and goes edge to edge of the

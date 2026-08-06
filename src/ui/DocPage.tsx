@@ -31,7 +31,7 @@ export function DocPage({ doc }: { doc: Doc }) {
         </a>
       </div>
 
-      <Footer gallery />
+      <Footer wander />
     </div>
   )
 }
