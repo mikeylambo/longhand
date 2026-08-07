@@ -15,6 +15,7 @@ import { PaletteBar } from './PaletteBar'
 import { washAllowed } from '../colour'
 import { ReportButton } from './ReportButton'
 import { clearDraft, loadDraft, saveDraft } from '../data/draft'
+import { coachingDone, markSeen, nextLesson, seenLessons, type Lesson } from './coach'
 
 /**
  * What the tray offers, in the order it offers it.
@@ -88,7 +89,8 @@ export function DrawTurn({
   const [color, setColor] = useState<string>(palette[0])
   const [size, setSize] = useState(1)
   const [tuning, setTuning] = useState<Tuning>(TUNING)
-  const [showHint, setShowHint] = useState(true)
+  const [lesson, setLesson] = useState<Lesson | null>(null)
+  const [openedTools, setOpenedTools] = useState(false)
   const [expired, setExpired] = useState(false)
   const [tool, setTool] = useState<Tool>('pen')
   const [stampIdx, setStampIdx] = useState(0)
@@ -169,9 +171,38 @@ export function DrawTurn({
   useEffect(() => surfaceRef.current?.setTuning(tuning), [tuning])
   useEffect(() => surfaceRef.current?.setInkBudget(tuning.inkBudget), [tuning.inkBudget])
 
+  /**
+   * The first turn, taught one thing at a time. See `coach.ts` for why this is
+   * not a tour.
+   *
+   * Held for the life of the turn rather than re-read per render, so a lesson
+   * is marked once when it appears rather than once per stroke.
+   */
+  const seen = useRef(seenLessons())
+  const coached = useRef(coachingDone())
+
   useEffect(() => {
-    if (strokeCount > 0) setShowHint(false)
-  }, [strokeCount])
+    if (coached.current || lesson || expired) return
+    const next = nextLesson(
+      {
+        strokes: strokeCount,
+        inkUsedFraction: budget > 0 ? ink / budget : 0,
+        openedTools,
+      },
+      seen.current,
+    )
+    if (!next) return
+    markSeen(next.id, seen.current)
+    setLesson(next)
+  }, [strokeCount, ink, budget, openedTools, lesson, expired])
+
+  // Long enough to read twice, short enough not to sit over the drawing. The
+  // next queued lesson appears after it, never on top of it.
+  useEffect(() => {
+    if (!lesson) return
+    const id = setTimeout(() => setLesson(null), 5200)
+    return () => clearTimeout(id)
+  }, [lesson])
 
   /**
    * Keeps the draft in step with the sheet.
@@ -312,7 +343,10 @@ export function DrawTurn({
           ))}
           <button
             className={`tool${tool !== 'pen' ? ' on' : ''}`}
-            onClick={() => setToolsOpen((v) => !v)}
+            onClick={() => {
+              setToolsOpen((v) => !v)
+              setOpenedTools(true)
+            }}
             aria-label="Other tools"
           >
             <ToolsIcon />
@@ -346,18 +380,20 @@ export function DrawTurn({
         </div>
 
         <div className="zoomtag">{zoomLabel}%</div>
-        {showHint && !expired && (
-          <div className="hint">Two fingers to move and zoom</div>
-        )}
-        {/* Finish is disabled below the floor, and a disabled button with no
-            reason next to it is the most annoying thing an interface can do.
-            Only once they have actually started, so it never greets anybody
-            on an empty sheet. */}
-        {started && !enoughInk && !expired && (
-          <div className="hint" role="status">
-            A little more than that, and it is yours to finish
-          </div>
-        )}
+        {/* One hint slot, and an order rather than three things that can
+            stack on each other. A refusal answers a tap that just happened and
+            has to win; the ink floor explains a disabled button in front of
+            them; a lesson is the least urgent thing here and waits. */}
+        {!expired &&
+          (refusal ? null : started && !enoughInk ? (
+            <div className="hint" role="status">
+              A little more than that, and it is yours to finish
+            </div>
+          ) : lesson ? (
+            <div className="hint" role="status">
+              {lesson.text}
+            </div>
+          ) : null)}
         {/* Only once there is somebody else's work on the sheet — an empty
             canvas has nothing to report, and offering it anyway would read as
             an invitation. */}

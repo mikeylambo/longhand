@@ -10,6 +10,7 @@ import { Invitation } from './Invitation'
 import { peekGift, type GiftPeek } from '../data/ledger'
 import { clearDraft } from '../data/draft'
 import { navigate } from './Router'
+import { finishCoaching } from './coach'
 import { transition } from './transition'
 import { LEDGER_ENABLED } from '../lib/supabase'
 
@@ -218,6 +219,9 @@ export function App({ giftToken }: { giftToken?: string } = {}) {
         // ten-minute clock for a slot nobody is using.
         void session.abandon().finally(() => {
           clearDraft()
+          // Deliberately not finishCoaching(): handing a slot back is not
+          // completing a turn, and somebody who backs out of their first one
+          // has not learned any of it yet.
           navigate('/gallery')
         })
       }}
@@ -237,6 +241,9 @@ export function App({ giftToken }: { giftToken?: string } = {}) {
           // mean a dropped connection took both the save and the only other
           // copy, which is the failure this draft exists to prevent.
           clearDraft()
+          // A whole turn taught these by doing them; being coached on the
+          // second turn is the thing every app gets wrong.
+          finishCoaching()
           transition(() => {
             setJustDrawn(layer)
             setCanvas(next)

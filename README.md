@@ -276,6 +276,37 @@ use the same view-transition crossfade the phases of a turn use.
 Links to another origin, new tabs, downloads and modified clicks are left to
 the browser, and there is a test that asserts the router does not swallow them.
 
+## The first turn, taught
+
+Not a tour. A stepped overlay on launch is the thing people dismiss without
+reading, and it would contradict the bet this product already made — one
+welcome screen, then straight onto a sheet. Somebody who has not drawn
+anything has no questions, so answering four of them up front is noise.
+
+So each lesson waits for the moment it is *about*. `src/ui/coach.ts`:
+
+| When | What |
+|---|---|
+| Arriving on the sheet | Two fingers to move and zoom — the only control not on screen |
+| The first stroke lands | Nothing here can be rubbed out — yours or anyone else's |
+| The ink meter has visibly moved | The pen runs out; this is all the ink this turn gets |
+| Three strokes in, tray never opened | There is more than a pen in the tray |
+
+The permanence rule is the one that most justifies the approach: said on
+arrival it is a warning about nothing, and said the instant a stroke lands it
+is a fact about something they just did.
+
+One at a time, longest-waiting first, and the hint slot has an order rather
+than three things that can stack in it — a fill's refusal answers a tap that
+just happened and wins; the ink floor explains a disabled button in front of
+them; a lesson is the least urgent thing on screen and waits.
+
+Coaching ends when a turn is **submitted**, not when a slot is handed back:
+somebody who completed a turn learned these by doing them, and somebody who
+backed out of their first one has not. Nothing blocks, nothing needs
+dismissing, and every lesson is about something the interface already shows —
+so a player who ignores all of it loses nothing.
+
 ## The first thing a stranger sees
 
 One screen, once, and the clip does the teaching. A finished canvas assembling
