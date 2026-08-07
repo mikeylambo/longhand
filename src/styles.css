@@ -1300,3 +1300,26 @@ a.linkbtn.solid {
     transition: none;
   }
 }
+
+/* Handing the slot back. Quiet and in the header rather than near the sheet:
+   it must be findable when somebody wants out, and nowhere near a thumb that
+   is drawing. Two steps when there is work to lose — the armed state is the
+   only red thing on the screen, which is the whole of the warning. */
+.leave {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: none;
+  color: var(--muted);
+  border-bottom: 1px solid transparent;
+}
+
+.leave:hover {
+  border-bottom-color: var(--rule);
+}
+
+.leave.arm {
+  color: #a73a34;
+  border-bottom-color: #a73a34;
+}

@@ -9,6 +9,7 @@ import { Welcome, markWelcomed, seenWelcome } from './Welcome'
 import { Invitation } from './Invitation'
 import { peekGift, type GiftPeek } from '../data/ledger'
 import { clearDraft } from '../data/draft'
+import { navigate } from './Router'
 import { transition } from './transition'
 import { LEDGER_ENABLED } from '../lib/supabase'
 
@@ -211,6 +212,15 @@ export function App({ giftToken }: { giftToken?: string } = {}) {
       expiresAt={canvas.expiresAt}
       canvasId={canvas.canvasId}
       onExpired={() => void take(undefined, true)}
+      onLeave={() => {
+        // Released first, then left. The other way round navigates away from
+        // the only code that knows the turn id, and the canvas waits out a
+        // ten-minute clock for a slot nobody is using.
+        void session.abandon().finally(() => {
+          clearDraft()
+          navigate('/gallery')
+        })
+      }}
       submitting={submitting}
       submitError={submitError}
       onDismissError={() => setSubmitError(null)}

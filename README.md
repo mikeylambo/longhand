@@ -123,6 +123,15 @@ double-booked and nothing is reserved forever:
   nobody is arriving.
 - The clock is visible from the first second, because per the brief an expired
   slot returns to the pool and the drawing is lost.
+- **A slot costs more than a tap.** `minInk` is a floor on the layer, enforced
+  in the client and again in `submit_turn`, because a slot is not recoverable
+  and playtesting found a single dot could spend one. Measured in ink rather
+  than strokes: a stroke count cannot tell a dot from a line. A tap measures
+  18, a drawn centimetre 200, and the floor is 200 — enough to stop an
+  accident, not enough to demand a drawing.
+- **A slot can be handed back.** There was no way out of a claimed turn short
+  of waiting out the ten minutes, which makes everyone else on the canvas wait
+  too. One tap when nothing is drawn, two when there is work to lose.
 
 **The close.** The last slot submits, the canvas flips to `closed`, and it gets
 a shareable page at `/c/<id>` with the full piece, the scrubbable timelapse,

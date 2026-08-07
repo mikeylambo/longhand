@@ -375,7 +375,7 @@ export class Surface {
       this.fitted = true
       this.fit()
     } else {
-      this.view.scale = Math.max(this.view.scale, this.fitScale)
+      this.view.scale = Math.max(this.view.scale, this.minScale)
       this.clampView()
       this.invalidate(true)
     }
@@ -383,6 +383,23 @@ export class Surface {
 
   private get maxScale(): number {
     return Math.max(this.fitScale * 8, 2)
+  }
+
+  /**
+   * How far out you can go.
+   *
+   * Fit used to be the floor, which meant the sheet could never be smaller
+   * than the viewport and there was no way to see it sitting in space. On a
+   * phone that costs you the one view where you can judge a mark against the
+   * whole square rather than against the edge of the screen, and playtesting
+   * found it immediately: the fit button appeared broken because tapping it at
+   * 100% did nothing, and 100% was as far out as it went.
+   *
+   * Two thirds is enough to see the sheet whole with room around it, and
+   * little enough that nobody arrives at a postage stamp by accident.
+   */
+  private get minScale(): number {
+    return this.fitScale * 0.66
   }
 
   /** Where the sheet is allowed to sit. Axes narrower than the viewport centre. */
@@ -1027,7 +1044,7 @@ export class Surface {
     const midY = (a.y + b.y) / 2
 
     const target = g.view0.scale * (d / g.dist0)
-    const scale = Math.min(this.maxScale, Math.max(this.fitScale, target))
+    const scale = Math.min(this.maxScale, Math.max(this.minScale, target))
     const k = scale / g.view0.scale
 
     this.view = {
@@ -1061,7 +1078,7 @@ export class Surface {
     const factor = Math.exp(-e.deltaY * 0.0018)
     const scale = Math.min(
       this.maxScale,
-      Math.max(this.fitScale, this.view.scale * factor),
+      Math.max(this.minScale, this.view.scale * factor),
     )
     const k = scale / this.view.scale
     this.view = {

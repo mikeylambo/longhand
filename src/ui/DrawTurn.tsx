@@ -55,6 +55,8 @@ interface Props {
   onDismissError: () => void
   onSubmit: (layer: Stroke[]) => void
   onExpired: () => void
+  /** Hands the slot back rather than making the canvas wait out the clock. */
+  onLeave: () => void
 }
 
 export function DrawTurn({
@@ -72,6 +74,7 @@ export function DrawTurn({
   onDismissError,
   onSubmit,
   onExpired,
+  onLeave,
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null)
   const surfaceRef = useRef<Surface | null>(null)
@@ -91,6 +94,7 @@ export function DrawTurn({
   const [stampIdx, setStampIdx] = useState(0)
   const [toolsOpen, setToolsOpen] = useState(false)
   const [refusal, setRefusal] = useState<string | null>(null)
+  const [leaving, setLeaving] = useState(false)
 
   /** Which turn a draft belongs to. Stable across renders so the save effect
    *  fires on the drawing changing, not on the component re-rendering. */
@@ -228,6 +232,20 @@ export function DrawTurn({
   const remaining = Math.max(0, 1 - ink / Math.max(1, budget))
   const zoomLabel = fitScale > 0 ? Math.round((zoom / fitScale) * 100) : 100
 
+  /**
+   * A slot is gone once it is used, so a single tap should not be able to
+   * spend one. Measured in ink rather than strokes because a stroke count
+   * cannot tell a dot from a line — playtesting found somebody could submit a
+   * single dot and take a twelfth of a canvas with it.
+   */
+  const enoughInk = ink >= TUNING.minInk
+  const started = strokeCount > 0
+
+  // Fit did nothing whenever the sheet was already fitted, which reads as a
+  // broken button rather than an unavailable one. Now that you can zoom out
+  // past fit as well as in, it is live whenever you are anywhere else.
+  const atFit = fitScale > 0 && Math.abs(zoom - fitScale) < fitScale * 0.005
+
   return (
     <div className="app">
       {SHOW_TUNER && <Tuner tuning={tuning} onChange={setTuning} />}
@@ -236,12 +254,27 @@ export function DrawTurn({
         <div className="slot">
           Slot {slot} / {slotCount}
           <TurnClock expiresAt={expiresAt} onExpired={handleExpired} />
+          {/* There was no way out of a claimed slot short of waiting ten
+              minutes for the clock, which makes everyone else on the canvas
+              wait too. Two steps when there is work to lose, one when there
+              is not. */}
+          {!expired && (
+            <button
+              className={`leave${leaving ? ' arm' : ''}`}
+              onClick={() => {
+                if (!started || leaving) onLeave()
+                else setLeaving(true)
+              }}
+            >
+              {leaving ? 'Sure? The drawing goes' : 'Give the slot back'}
+            </button>
+          )}
         </div>
         <div className="seed">“{seed}”</div>
         <div className="right">
           <button
             className="linkbtn solid"
-            disabled={strokeCount === 0 || expired || submitting}
+            disabled={!enoughInk || expired || submitting}
             onClick={() => onSubmit(surfaceRef.current?.getLayer() ?? [])}
           >
             {submitting ? 'Saving…' : 'Finish'}
@@ -304,6 +337,7 @@ export function DrawTurn({
           </button>
           <button
             className="tool"
+            disabled={atFit}
             onClick={() => surfaceRef.current?.fit()}
             aria-label="Fit the whole canvas"
           >
@@ -314,6 +348,15 @@ export function DrawTurn({
         <div className="zoomtag">{zoomLabel}%</div>
         {showHint && !expired && (
           <div className="hint">Two fingers to move and zoom</div>
+        )}
+        {/* Finish is disabled below the floor, and a disabled button with no
+            reason next to it is the most annoying thing an interface can do.
+            Only once they have actually started, so it never greets anybody
+            on an empty sheet. */}
+        {started && !enoughInk && !expired && (
+          <div className="hint" role="status">
+            A little more than that, and it is yours to finish
+          </div>
         )}
         {/* Only once there is somebody else's work on the sheet — an empty
             canvas has nothing to report, and offering it anyway would read as

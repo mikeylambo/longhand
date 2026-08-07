@@ -134,6 +134,17 @@ export const DEFAULT_TUNING = {
    * makes a careless one cost something.
    */
   inkBudget: 10000,
+  /**
+   * The least a layer can be and still be a contribution.
+   *
+   * A slot is a twelfth of somebody's canvas and it is gone once used, so a
+   * single tap should not be able to spend one. This is stroke length in
+   * logical px: a dot is under 20, a deliberate centimetre of line is around
+   * 200. Low on purpose — the point is to stop an accident, not to demand a
+   * drawing, and somebody who wants to add one small considered mark still
+   * can.
+   */
+  minInk: 200,
   /** Screen speed (css px/ms) at which the pen reaches its thinnest. */
   speedRef: 1.7,
   /** Width multiplier at max speed / at rest. */
@@ -177,6 +188,7 @@ function num(key: string, fallback: number): number {
 
 export const TUNING: Tuning = {
   inkBudget: num('ink', DEFAULT_TUNING.inkBudget),
+  minInk: num('minInk', DEFAULT_TUNING.minInk),
   speedRef: num('speedRef', DEFAULT_TUNING.speedRef),
   minFactor: num('minFactor', DEFAULT_TUNING.minFactor),
   maxFactor: num('maxFactor', DEFAULT_TUNING.maxFactor),
@@ -195,6 +207,14 @@ export const SHOW_TUNER = params.get('tune') === '1'
 /** Signature pad is the same engine at a different size and a fixed pen. */
 export const SIGNATURE_W = 900
 export const SIGNATURE_H = 340
-export const SIGNATURE_INK = 1600
+/**
+ * Ink for a signature, raised from 1600 after playtesting.
+ *
+ * The sheet is 900x340 and the pen is fixed-width, so a name written at a
+ * comfortable size costs more than the first guess allowed — people were
+ * running dry partway through their own name, which is a bad first thirty
+ * seconds in a product whose whole identity is that mark.
+ */
+export const SIGNATURE_INK = 3200
 export const SIGNATURE_WIDTH = 6
 export const SIGNATURE_COLOR = '#1B1A17'
