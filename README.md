@@ -1350,23 +1350,54 @@ drift:
 node scripts/make-welcome.mjs    # regenerates public/welcome-canvas.json
 ```
 
+## The share image
+
+`/c/<id>` names the canvas in a shared link's title and description; `/c/<id>/card.png`
+is the picture beside them. Until it existed, a finished drawing and a link to
+the terms page previewed identically — the app icon and the word Foolscap.
+
+The rule that shaped it: the preview must not be a second, subtly different
+renderer. A canvas is a few tens of KB of stroke vectors, and the app turns
+those into pixels through exactly one path — `decodeLayer`, then `drawLayers`.
+`api/og.ts` calls the same two functions against a Skia canvas
+(`@napi-rs/canvas`) instead of a browser one, so what scrolls past in a chat is
+what the artist saw in their hand. A hand-written SVG translation would have
+been lighter and would have drifted the first time a wash multiplied or a fill
+kept its holes; the whole point of storing a fill as a polygon rather than a
+seed point was that a polygon is a fact, and the same reasoning forbids a
+second renderer here.
+
+The canvas is square and every platform wants 1.91:1, so the drawing sits on a
+wider sheet of the same paper — which reads as a mounted drawing rather than a
+letterbox, and wants no cropping and no decision about which third of a square
+to discard. One transform maps the 2048 sheet into the centred square, the same
+arrangement `renderLayers` uses in the browser.
+
+It is a Node function, not edge like `api/canvas.ts`, for one reason: the
+rasteriser is a native module and edge has none. Anything that is not a listed
+canvas with a hand on it — a bad id, a private canvas, a blank sheet, a database
+blip — falls back to the app icon, so a link always previews as *some* valid
+image rather than a broken-image glyph. A closed canvas can never change, so its
+card is cached for a year; an open one gains hands, so its card is allowed to go
+stale within the minute. `og:image` only points here once `slots_filled` clears
+one, because a blank sheet previews worse than the mark that says what the app
+is.
+
+Verified by rendering a real finished canvas — twelve hands, a harbour — through
+the exact `decodeLayer`/`drawLayers` path this ships, and against a synthetic
+layer exercising the wash's multiply and the fill's even-odd holes, which are
+the two things a naive rasteriser gets wrong. The native module's behaviour on
+Vercel is the one thing no local run can prove, so it is confirmed against the
+live endpoint on deploy rather than trusted.
+
 ## Not built yet
 
-**A rendered image on a shared link.** `/c/<id>` now serves real `og:title`
-and `og:description` — the canvas named, and whether it is finished — through
-`api/canvas.ts`, a Vercel edge function that patches the shell it fetches from
-the deployment rather than holding a copy of the head that could drift. The
-image is still the app icon. Doing better means rasterising vector layers
-server-side, which is a prototype rather than a known quantity, and it is the
-one thing here I would not promise a shape for until it exists.
-
-Deliberately not crawler-sniffed: every request for `/c/<id>` gets the same
-document. Serving scrapers something different is cloaking, and it means the
-thing you tested is not the thing that ships.
-
-A *server-side* render. The export above runs in the player's browser, which is
-fine for someone saving their own canvas but no use for generating an OG preview
-image or a video for a canvas nobody has opened. That needs a worker.
+**A server-side video.** The still image is done (see *The share image*), but
+the *timelapse* export still runs in the player's browser, which is fine for
+someone saving their own canvas and no use for a video of a canvas nobody has
+opened. The still proves the render path works server-side; the video is the
+same walk over the same data and wants the same treatment, plus a muxer, which
+is the piece that makes it a worker rather than a request.
 
 Accounts. The world map, prints and school accounts are built but Phase C, and
 all gated on the archive being worth something first.

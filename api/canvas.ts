@@ -124,6 +124,19 @@ export default async function handler(request: Request): Promise<Response> {
           /<meta\s+name="description"[\s\S]*?\/>/i,
           `<meta name="description" content="${escapeHtml(description)}" />`,
         )
+
+        // The rendered artwork — see api/og.ts. Absolute, because a relative
+        // og:image is the commonest reason a preview shows nothing. Only once a
+        // hand is on it: a blank sheet previews worse than the mark that at
+        // least says what the app is, so an empty canvas keeps the icon.
+        if (c.slots_filled >= 1) {
+          const card = `${url.origin}/c/${id}/card.png`
+          html = replaceMeta(html, 'og:image', card)
+          html = replaceMeta(html, 'og:image:type', 'image/png')
+          html = replaceMeta(html, 'og:image:width', '1200')
+          html = replaceMeta(html, 'og:image:height', '630')
+          html = replaceMeta(html, 'og:image:alt', `“${c.seed_word}” on Foolscap`)
+        }
       }
     } catch {
       // A preview is a nicety. The page opening is not.

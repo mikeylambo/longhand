@@ -1,6 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
+    { "source": "/c/:id/card.png", "destination": "/api/og?id=:id" },
     { "source": "/c/:id", "destination": "/api/canvas" },
     {
       "source": "/((?!api/|assets/|index.html|manifest.webmanifest|favicon.ico|welcome-canvas.json).*)",
