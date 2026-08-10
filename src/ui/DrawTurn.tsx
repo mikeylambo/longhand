@@ -390,7 +390,7 @@ export function DrawTurn({
               A little more than that, and it is yours to finish
             </div>
           ) : lesson ? (
-            <div className="hint" role="status">
+            <div className={`hint lesson at-${lesson.at}`} role="status">
               {lesson.text}
             </div>
           ) : null)}

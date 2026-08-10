@@ -24,9 +24,22 @@
 
 export type LessonId = 'move' | 'permanent' | 'ink' | 'tools'
 
+/**
+ * What a lesson points at.
+ *
+ * A hint that says "there is more than a pen in the tray" while floating in the
+ * middle of the screen is asking the reader to go hunting for the tray. Each
+ * lesson is about a specific thing the interface already shows, so each one is
+ * drawn next to that thing with a caret aimed at it — except `sheet`, which is
+ * a statement about the whole surface and points at nothing, because the whole
+ * point of it is that there is no eraser to point at.
+ */
+export type LessonAt = 'zoom' | 'sheet' | 'meter' | 'tray'
+
 export interface Lesson {
   id: LessonId
   text: string
+  at: LessonAt
 }
 
 /**
@@ -38,7 +51,9 @@ const LESSONS: (Lesson & { when: (s: CoachState) => boolean })[] = [
   {
     id: 'move',
     text: 'Two fingers to move and zoom',
-    // Immediately: it is the only control that is not visible on screen.
+    // Immediately: it is the only control that is not visible on screen. Aimed
+    // at the zoom readout, which is the visible thing the gesture changes.
+    at: 'zoom',
     when: () => true,
   },
   {
@@ -46,14 +61,18 @@ const LESSONS: (Lesson & { when: (s: CoachState) => boolean })[] = [
     text: 'Nothing here can be rubbed out — yours or anyone else’s',
     // The moment there is a mark to be permanent about. Said now it is a fact
     // about something they just did; said on arrival it is a warning about
-    // nothing.
+    // nothing. Over the sheet, pointing at nothing: the absence of an eraser is
+    // the whole lesson.
+    at: 'sheet',
     when: (s) => s.strokes >= 1,
   },
   {
     id: 'ink',
     text: 'The pen runs out. This is all the ink this turn gets',
     // Once the meter has visibly moved, so the sentence has something to point
-    // at. Before that it is a rule about an abstraction.
+    // at. Before that it is a rule about an abstraction — and now it points at
+    // the meter that just moved.
+    at: 'meter',
     when: (s) => s.inkUsedFraction >= 0.22,
   },
   {
@@ -61,7 +80,8 @@ const LESSONS: (Lesson & { when: (s: CoachState) => boolean })[] = [
     text: 'There is more than a pen in the tray',
     // Only once somebody is drawing in earnest and has not found it. Said
     // earlier it is a feature list; said here it answers a question they are
-    // about to have.
+    // about to have — with a caret on the tray that holds the answer.
+    at: 'tray',
     when: (s) => s.strokes >= 3 && !s.openedTools,
   },
 ]
@@ -115,7 +135,7 @@ export function coachingDone(): boolean {
 export function nextLesson(state: CoachState, seen: Set<LessonId>): Lesson | null {
   for (const l of LESSONS) {
     if (seen.has(l.id)) continue
-    if (l.when(state)) return { id: l.id, text: l.text }
+    if (l.when(state)) return { id: l.id, text: l.text, at: l.at }
     // Deliberately no `break`. If somebody draws three strokes before the ink
     // meter moves, the tools lesson should not be stuck behind the ink one.
   }

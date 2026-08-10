@@ -261,6 +261,87 @@ button {
   transition: opacity 500ms ease;
 }
 
+/* --------------------------------------------------------- anchored lessons */
+
+/* A first-turn lesson is drawn next to the thing it is about, with a caret
+   aimed at it, so "there is more than a pen in the tray" points at the tray
+   instead of asking the reader to go and find it. See coach.ts.
+
+   Only lessons move. The refusal and the ink-floor hint keep the centred base
+   position above — they answer something that just happened in front of the
+   player, not a control they are being shown. */
+.hint.lesson {
+  white-space: normal;
+  max-width: min(280px, calc(100% - 24px));
+  text-align: center;
+}
+
+/* Over the sheet, pointing at nothing: the lesson is that there is no eraser. */
+.hint.lesson.at-sheet {
+  left: 50%;
+  top: 44%;
+  bottom: auto;
+  transform: translate(-50%, -50%);
+}
+
+/* Under the ink meter, which sits just above the stage. */
+.hint.lesson.at-meter {
+  left: 50%;
+  top: 10px;
+  bottom: auto;
+  transform: translateX(-50%);
+}
+
+/* Beside the tool tray, level with the tools button — the middle of seven, so
+   the tray's own vertical centre. The tray is right:10px, a 40px button in 6px
+   of padding, hence 64px of clearance. */
+.hint.lesson.at-tray {
+  right: 64px;
+  left: auto;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+  text-align: right;
+}
+
+/* Just above the zoom readout at bottom-left — the visible thing the two-finger
+   gesture changes. */
+.hint.lesson.at-zoom {
+  left: 10px;
+  bottom: 42px;
+  top: auto;
+  transform: none;
+  text-align: left;
+}
+
+/* The caret: a square of the same paper turned to a diamond, sitting on the
+   edge that faces the control so a corner points at it. */
+.hint.lesson::after {
+  content: '';
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  background: rgba(231, 224, 210, 0.9);
+  transform: rotate(45deg);
+}
+.hint.lesson.at-sheet::after {
+  display: none;
+}
+.hint.lesson.at-meter::after {
+  top: -3px;
+  left: 50%;
+  margin-left: -4.5px;
+}
+.hint.lesson.at-tray::after {
+  right: -3px;
+  top: 50%;
+  margin-top: -4.5px;
+}
+.hint.lesson.at-zoom::after {
+  bottom: -3px;
+  left: 14px;
+}
+
 /* A save that failed, over the drawing that survived it. */
 .banner {
   position: absolute;

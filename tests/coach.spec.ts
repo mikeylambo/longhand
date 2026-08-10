@@ -70,8 +70,41 @@ async function alreadySeen(page: import('@playwright/test').Page, ids: string[])
 test('the first thing taught is the control that is not on screen', async ({ page }) => {
   await reachTheSheet(page)
   await expect(page.getByText('Two fingers to move and zoom')).toBeVisible()
+  // Aimed at the zoom readout, the visible thing the gesture changes — not
+  // floating in the middle of the screen.
+  await expect(page.locator('.hint.lesson.at-zoom')).toBeVisible()
   // One at a time: the permanence lesson has not jumped the queue.
   await expect(page.getByText(/cannot be rubbed out|rubbed out/i)).toHaveCount(0)
+})
+
+test('every lesson is aimed at the control it is about', async ({ page }) => {
+  // The id-to-anchor mapping, checked without having to physically move the ink
+  // meter to its threshold: coach.ts is pure, so its own logic can answer.
+  await page.goto('/terms')
+  const map = await page.evaluate(async () => {
+    const m = await import('/src/ui/coach.ts')
+    const at = (
+      state: { strokes: number; inkUsedFraction: number; openedTools: boolean },
+      seen: string[] = [],
+    ) => m.nextLesson(state, new Set(seen as never[]))
+    return {
+      move: at({ strokes: 0, inkUsedFraction: 0, openedTools: false }),
+      permanent: at({ strokes: 1, inkUsedFraction: 0, openedTools: false }, ['move']),
+      ink: at({ strokes: 1, inkUsedFraction: 0.3, openedTools: false }, [
+        'move',
+        'permanent',
+      ]),
+      tools: at({ strokes: 4, inkUsedFraction: 0, openedTools: false }, [
+        'move',
+        'permanent',
+        'ink',
+      ]),
+    }
+  })
+  expect(map.move).toMatchObject({ id: 'move', at: 'zoom' })
+  expect(map.permanent).toMatchObject({ id: 'permanent', at: 'sheet' })
+  expect(map.ink).toMatchObject({ id: 'ink', at: 'meter' })
+  expect(map.tools).toMatchObject({ id: 'tools', at: 'tray' })
 })
 
 test('the permanence rule arrives with the first stroke, not before it', async ({
@@ -85,6 +118,8 @@ test('the permanence rule arrives with the first stroke, not before it', async (
 
   await pointer(page, 12)
   await expect(page.getByText(/rubbed out/i)).toBeVisible()
+  // Over the sheet, where the mark it is about just landed.
+  await expect(page.locator('.hint.lesson.at-sheet')).toBeVisible()
 })
 
 test('a lesson yields to the reason a button is disabled', async ({ page }) => {

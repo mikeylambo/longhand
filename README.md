@@ -322,18 +322,31 @@ reading, and it would contradict the bet this product already made — one
 welcome screen, then straight onto a sheet. Somebody who has not drawn
 anything has no questions, so answering four of them up front is noise.
 
-So each lesson waits for the moment it is *about*. `src/ui/coach.ts`:
+So each lesson waits for the moment it is *about*, and is drawn next to the
+thing it is about. `src/ui/coach.ts`:
 
-| When | What |
-|---|---|
-| Arriving on the sheet | Two fingers to move and zoom — the only control not on screen |
-| The first stroke lands | Nothing here can be rubbed out — yours or anyone else's |
-| The ink meter has visibly moved | The pen runs out; this is all the ink this turn gets |
-| Three strokes in, tray never opened | There is more than a pen in the tray |
+| When | What | Points at |
+|---|---|---|
+| Arriving on the sheet | Two fingers to move and zoom — the only control not on screen | the zoom readout |
+| The first stroke lands | Nothing here can be rubbed out — yours or anyone else's | nothing — the sheet |
+| The ink meter has visibly moved | The pen runs out; this is all the ink this turn gets | the meter |
+| Three strokes in, tray never opened | There is more than a pen in the tray | the tray |
 
 The permanence rule is the one that most justifies the approach: said on
 arrival it is a warning about nothing, and said the instant a stroke lands it
 is a fact about something they just did.
+
+A hint that said "there is more than a pen in the tray" from the middle of the
+screen was asking the reader to go and find the tray, so each pill now sits
+beside the control it names with a caret aimed at it — the tray, the ink
+meter, the zoom readout that the two-finger gesture changes. The exception is
+permanence, which points at nothing on purpose: it is a statement about the
+whole surface, and the whole lesson is that there is no eraser to point at.
+The anchor is CSS relative to the stage rather than a measured canvas
+coordinate, so it cannot drift when somebody pans mid-hint — the tools button
+is the middle of the tray's seven, so the tray's own centre, and the meter and
+readout do not move. `tests/coach.spec.ts` asserts the id-to-anchor mapping
+and that the class lands on the sheet.
 
 One at a time, longest-waiting first, and the hint slot has an order rather
 than three things that can stack in it — a fill's refusal answers a tap that
