@@ -276,6 +276,45 @@ use the same view-transition crossfade the phases of a turn use.
 Links to another origin, new tabs, downloads and modified clicks are left to
 the browser, and there is a test that asserts the router does not swallow them.
 
+## Opening
+
+The splash is inline in `index.html`, above the module script, so it paints on
+the first parse rather than after a 300 KB bundle has been fetched and
+mounted. An installed app that opens on white for half a second reads as
+broken in a way the same half-second behind a wordmark does not, and iOS gives
+a standalone PWA no splash of its own unless it is handed a startup image per
+device size.
+
+Coming *down* is the harder half. It used to be a timer alone — a floor of 1.4
+seconds from the moment the bundle ran — and on this machine that is always
+fine: traced frame by frame, a first visit paints the welcome screen at 305 ms
+and the splash begins fading at 1660 ms, and it still holds under a twelvefold
+CPU throttle, because everything that slows the mount slows the timer with it.
+
+The case a timer cannot survive is the one that matters most in an installed
+app. The shell comes off the service worker instantly and the hand is already
+signed, so booting is one round trip to the relay to be given a slot. When that
+round trip outlasts the floor the splash lifts and uncovers `Finding you a
+sheet…` — a second loading screen behind the first one, two waits where there
+should be one.
+
+So `src/ui/boot.ts` lets a screen say it is not ready, and the handover waits:
+
+| | |
+|---|---|
+| **Floor** 1.4 s | A wordmark that flashes past reads as a glitch rather than as opening |
+| **Ready** | `App` while it is still claiming a slot; `CanvasPage` while a shared link is still loading |
+| **Ceiling** 4.2 s | A relay that never answers must not trap anybody behind a logo — past that, the loading screen is the honest thing to be looking at |
+
+Holds are keyed rather than counted, so a screen answers one question on every
+render — am I ready — instead of pairing up acquisitions and releases.
+
+The slow connection this is for does not exist on a development machine, which
+is exactly why it is tested rather than trusted: `tests/boot.spec.ts` imports
+`boot.ts` into the page at the same URL the app imports it from, which makes it
+the same module instance, and holds the splash open from before the app boots.
+Reverting the handover to the old timer fails two of the four.
+
 ## The first turn, taught
 
 Not a tour. A stepped overlay on launch is the thing people dismiss without

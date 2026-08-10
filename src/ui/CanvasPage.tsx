@@ -7,6 +7,7 @@ import { Replay } from './Replay'
 import { renderTimelapseVideo, videoExportSupported } from '../engine/video'
 import { ReportButton } from './ReportButton'
 import { cachedSignatureId, requestPrint } from '../data/ledger'
+import { holdSplash } from './boot'
 import { Footer } from './Footer'
 
 interface Props {
@@ -88,6 +89,12 @@ export function CanvasPage({ canvasId }: Props) {
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
   }, [canvasId])
+
+  // A shared link is the other way somebody opens this cold, and it is the way
+  // a stranger opens it first. Same bargain as the sheet: the splash waits out
+  // the fetch rather than handing over to a second loading screen.
+  useEffect(() => holdSplash('canvas', !state && !error), [state, error])
+  useEffect(() => () => holdSplash('canvas', false), [])
 
   const full = useMemo(
     () =>

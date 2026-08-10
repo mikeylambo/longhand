@@ -10,6 +10,7 @@ import { Invitation } from './Invitation'
 import { peekGift, type GiftPeek } from '../data/ledger'
 import { clearDraft } from '../data/draft'
 import { navigate } from './Router'
+import { holdSplash } from './boot'
 import { finishCoaching } from './coach'
 import { transition } from './transition'
 import { LEDGER_ENABLED } from '../lib/supabase'
@@ -118,6 +119,13 @@ export function App({ giftToken }: { giftToken?: string } = {}) {
   useEffect(() => {
     void boot()
   }, [boot])
+
+  // Keeps the splash up while this is still asking the relay for a slot, so a
+  // slow connection is one wait behind the wordmark rather than two. See
+  // `boot.ts`; it is bounded there, and this releases on unmount as well in
+  // case somebody navigates away mid-boot.
+  useEffect(() => holdSplash('sheet', phase === 'loading'), [phase])
+  useEffect(() => () => holdSplash('sheet', false), [])
 
   if (phase === 'loading') {
     return (
