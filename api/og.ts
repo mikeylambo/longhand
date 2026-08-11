@@ -89,8 +89,15 @@ async function fallback(origin: string): Promise<Response> {
 }
 
 export default async function handler(request: Request): Promise<Response> {
-  const url = new URL(request.url)
-  const origin = url.origin
+  // Node runtime, not edge: here request.url is the path alone, not an absolute
+  // URL, so `new URL(request.url)` throws. The origin has to be rebuilt from the
+  // forwarded host — which is also the origin the fallback icon is fetched from
+  // and the one og:url would use, so it must be the real one, not a guess.
+  const host =
+    request.headers.get('x-forwarded-host') ?? request.headers.get('host') ?? ''
+  const proto = request.headers.get('x-forwarded-proto') ?? 'https'
+  const origin = host ? `${proto}://${host}` : 'https://www.foolscap.ink'
+  const url = new URL(request.url, origin)
   const id = url.searchParams.get('id') ?? ''
 
   const base = process.env.VITE_SUPABASE_URL

@@ -1417,6 +1417,18 @@ specifier must name. Proved before the second deploy by emitting the function to
 plain JavaScript and loading it under `node` directly, which is the loader
 Vercel uses and the one tsc and Vite do not.
 
+The second deploy surfaced the second Node-versus-edge difference. `api/canvas.ts`
+is an edge function, where `request.url` is absolute; `api/og.ts` is a Node
+function, where it is the path alone, so `new URL(request.url)` threw
+`Invalid URL` on every request. The origin is rebuilt from the forwarded host
+instead — which is also the origin the fallback icon is fetched from, so it has
+to be the real one. This time the whole function was simulated before deploying:
+emitted, its `fetch` stubbed with a real canvas's rows, and called with a
+path-only request carrying a host header — the exact shape Vercel delivers —
+which returned a 200 image/png of the right drawing. The lesson, written down:
+a Node serverless function is not an edge function with a different `runtime`
+line, and the two places that bite are module resolution and the request.
+
 ## Not built yet
 
 **A server-side video.** The still image is done (see *The share image*), but
