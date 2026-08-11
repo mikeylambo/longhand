@@ -1,5 +1,8 @@
 import type { Stroke, View } from './types'
-import { PAPER } from '../config'
+// Extension on purpose: this module is pulled into the Node-ESM serverless
+// render in api/og.ts, where an extensionless relative import throws at
+// runtime. Harmless everywhere else — Vite and tsc resolve it the same.
+import { PAPER } from '../config.js'
 
 /**
  * Sets the context up so all drawing happens in logical canvas coordinates —

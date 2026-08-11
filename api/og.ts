@@ -26,10 +26,16 @@
  */
 
 import { createCanvas } from '@napi-rs/canvas'
-import { drawLayers } from '../src/engine/render'
-import { decodeLayer, type EncodedLayer } from '../src/engine/codec'
-import { PAPER, CANVAS_W, CANVAS_H } from '../src/config'
-import type { Stroke } from '../src/engine/types'
+// Extensions on purpose. package.json is "type": "module", so Vercel runs the
+// compiled api/og.js under Node's native ESM loader, which — unlike tsc, Vite
+// and esbuild — refuses a relative import with no extension. Vercel transpiles
+// these files rather than bundling them, so an extensionless specifier that is
+// fine everywhere else reaches production and throws ERR_MODULE_NOT_FOUND at
+// the first request. The compiled files are .js, so that is what is named here.
+import { drawLayers } from '../src/engine/render.js'
+import { decodeLayer, type EncodedLayer } from '../src/engine/codec.js'
+import { PAPER, CANVAS_W, CANVAS_H } from '../src/config.js'
+import type { Stroke } from '../src/engine/types.js'
 
 export const config = { runtime: 'nodejs' }
 
