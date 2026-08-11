@@ -3,6 +3,7 @@ import { PAPER } from '../config'
 import { fetchClosedCanvases, fetchLayers, type CanvasRow } from '../data/ledger'
 import { LEDGER_ENABLED } from '../lib/supabase'
 import { buildTimeline, paintRange } from '../engine/timelapse'
+import { navigate } from './Router'
 
 /**
  * The gallery as a wall.
@@ -12,7 +13,13 @@ import { buildTimeline, paintRange } from '../engine/timelapse'
  * a projector in a school corridor, a spare tablet on a shelf. Each canvas
  * fills in, rests, and gives way to the next, forever.
  *
- * No chrome, no controls, no cursor. The only interface is closing the tab.
+ * On a wall this wants no chrome — but the same URL is reachable from inside
+ * the app, from the gallery, and there "close the tab" is not an exit, it is a
+ * dead end. So there is one way out, and it behaves the way a video player's
+ * controls do: shown on arrival, then faded, and back the instant anything is
+ * touched or moved or a key is pressed. A television nobody touches keeps its
+ * clean full-bleed show; a phone that lands here has a door. Escape leaves too.
+ *
  * It also keeps the screen awake if the browser will let it, because a
  * screensaver that gets replaced by an actual screensaver is a joke that only
  * lands once.
@@ -20,12 +27,44 @@ import { buildTimeline, paintRange } from '../engine/timelapse'
 const FILL_MS = 14000
 const REST_MS = 5000
 
+/** How long the way out lingers after the last sign of a person, before the
+ *  wall goes back to being just the wall. */
+const EXIT_LINGER_MS = 4000
+
 export function ScreenPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [queue, setQueue] = useState<CanvasRow[]>([])
   const [at, setAt] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [caption, setCaption] = useState<{ seed: string; hands: number } | null>(null)
+  const [exitShown, setExitShown] = useState(true)
+
+  // The way out, and only when a person is here to want it. Every sign of one —
+  // a moved pointer, a touch, a key — brings it back and restarts the linger;
+  // Escape is a way out in itself. On a wall none of these ever fire, so after
+  // the first few seconds it is gone and the show is full-bleed again.
+  useEffect(() => {
+    let hide: ReturnType<typeof setTimeout>
+    const wake = () => {
+      setExitShown(true)
+      clearTimeout(hide)
+      hide = setTimeout(() => setExitShown(false), EXIT_LINGER_MS)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') navigate('/gallery')
+      else wake()
+    }
+    wake()
+    window.addEventListener('pointermove', wake)
+    window.addEventListener('pointerdown', wake)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      clearTimeout(hide)
+      window.removeEventListener('pointermove', wake)
+      window.removeEventListener('pointerdown', wake)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [])
 
   useEffect(() => {
     if (!LEDGER_ENABLED) {
@@ -111,9 +150,19 @@ export function ScreenPage() {
     }
   }, [queue, at])
 
+  const leave = (
+    <button
+      className={`screen-exit${exitShown ? '' : ' gone'}`}
+      onClick={() => navigate('/gallery')}
+    >
+      ← Gallery
+    </button>
+  )
+
   if (error) {
     return (
       <div className="screen">
+        {leave}
         <p className="screen-caption">{error}</p>
       </div>
     )
@@ -121,6 +170,7 @@ export function ScreenPage() {
 
   return (
     <div className="screen">
+      {leave}
       <canvas ref={canvasRef} />
       {caption && (
         <p className="screen-caption">
