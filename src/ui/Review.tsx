@@ -47,10 +47,6 @@ export function Review({ canvas, layer, signature, mode, onNext }: Props) {
     [signature],
   )
 
-  const bytes = useMemo(
-    () => new Blob([JSON.stringify(encoded)]).size,
-    [encoded],
-  )
   const ink = layer.reduce((n, s) => n + s.ink, 0)
   const slot = canvas.justFilledSlot ?? canvas.slot
   const format = formatFor(canvas.slotCount)
@@ -70,10 +66,10 @@ export function Review({ canvas, layer, signature, mode, onNext }: Props) {
 
   return (
     <div className="panel">
-      <h1>{canvas.closed ? 'That closed it' : 'Yours is on it'}</h1>
+      <h1>{canvas.closed ? 'Canvas complete' : 'Yours is on it'}</h1>
       <p>
         {canvas.closed
-          ? `“${canvas.seed}” is finished — ${format.hands} hands, one sheet, and it can never be changed.`
+          ? `“${canvas.seed}” is complete — ${format.hands} hands shared this sheet, and now it belongs to the gallery.`
           : waiting === 1
             ? `Slot ${slot} of ${canvas.slotCount} on “${canvas.seed}”. One more hand and it closes.`
             : `Slot ${slot} of ${canvas.slotCount} on “${canvas.seed}”. ${waiting} more hands and it closes. Nothing you drew can be removed by anyone who comes after you.`}
@@ -100,12 +96,11 @@ export function Review({ canvas, layer, signature, mode, onNext }: Props) {
         <div className="review-caption">In the ledger</div>
         <div className="stat">
           {layer.length} {layer.length === 1 ? 'stroke' : 'strokes'} ·{' '}
-          {countPoints(roundTripped)} points · {Math.round(ink)} px of ink ·{' '}
-          {(bytes / 1024).toFixed(1)} KB
+          {countPoints(roundTripped)} points · {Math.round(ink)} pixels of ink
         </div>
         <div className="stat">
           {mode === 'ledger'
-            ? 'Written and locked. Append-only — it can be hidden, never deleted.'
+            ? 'Written and locked. This layer is permanently preserved and can never be erased.'
             : 'Local mode: nothing was persisted. Set the Supabase env vars to write to the ledger.'}
         </div>
         <div className="row">
@@ -143,7 +138,7 @@ export function Review({ canvas, layer, signature, mode, onNext }: Props) {
       {mode === 'ledger' && (
         <>
           <p className="chooser">
-            or ask for{' '}
+            Start a new canvas:{' '}
             {FORMATS.filter((f) => !f.onRequest).map((f, i) => (
               <span key={f.slots}>
                 {i > 0 && ' · '}
@@ -158,7 +153,7 @@ export function Review({ canvas, layer, signature, mode, onNext }: Props) {
               it will be open for a long time, which is the appeal and also
               the thing not to bury in a row of ordinary choices. */}
           <p className="chooser quiet">
-            something longer, which will take a while to fill:{' '}
+            Or begin a longer journey:{' '}
             {FORMATS.filter((f) => f.onRequest).map((f, i) => (
               <span key={f.slots}>
                 {i > 0 && ' · '}

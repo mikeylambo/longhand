@@ -71,22 +71,22 @@ export function Welcome({ onStart }: Props) {
       <div className="scroll">
         <WelcomeReel />
 
-        <h1>One drawing, lots of hands</h1>
+        <h1>One canvas, many hands</h1>
         <p>
-          You add a little, then it is someone else&rsquo;s turn. When the last
-          hand finishes, the drawing is done — and it stays that way for good.
+          You draw a little, then pass it on. When the last artist finishes, the
+          artwork is complete.
         </p>
 
         <dl className="promises">
-          <dt>Nothing rubs out</dt>
+          <dt>Permanent ink</dt>
           <dd>
-            Your part stays, and so does everyone else&rsquo;s. You can add to
-            the drawing, but you can never rub any of it out.
+            Every stroke matters. You can always add to the drawing, but you can
+            never erase — so embrace the happy accidents.
           </dd>
-          <dt>Ten minutes</dt>
+          <dt>Take your time</dt>
           <dd>
-            Your turn lasts ten minutes — time to think, not a race. Stop early
-            and it passes to whoever is next.
+            Ten minutes for your turn — time to think, not a race. Finished
+            early? Pass it right to the next artist.
           </dd>
         </dl>
 

@@ -87,8 +87,8 @@ export function Gallery() {
     <div className="panel">
       <h1>The gallery</h1>
       <p>
-        Canvases every hand has been on. Nothing here can change again — not by
-        the people who drew it, and not by us.
+        A museum of finished pieces. Every canvas here is complete and
+        untouched — preserved exactly as the last artist left it.
       </p>
 
       {/* Only once there is something of yours to filter to. A toggle that can

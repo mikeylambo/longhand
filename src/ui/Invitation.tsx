@@ -36,10 +36,10 @@ export function Invitation({
 
       <div className="scroll">
         <dl className="promises">
-          <dt>Ink only</dt>
+          <dt>Permanent ink</dt>
           <dd>
-            Nothing you add can be removed — and nothing you add can remove
-            anyone else&rsquo;s.
+            Every stroke matters. You can always add to the drawing, but you can
+            never erase — so embrace the happy accidents.
           </dd>
           <dt>Ten minutes, once you start</dt>
           <dd>

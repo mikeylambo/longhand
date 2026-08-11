@@ -61,9 +61,7 @@ export function MarkPage() {
     <div className="panel">
       <h1>Your mark</h1>
       <p>
-        This is the whole of who you are here. There is no account behind it, no
-        password, and nothing that says who you are — only this, and the work it
-        has been part of.
+        No passwords, no profiles. Just you, and the art you help create.
       </p>
 
       <div className="scroll">
@@ -85,12 +83,12 @@ export function MarkPage() {
         )}
 
         {/* -------------------------------------------------- the key */}
-        <div className="review-caption">Carrying it to another browser</div>
+        <div className="review-caption">Protect your mark</div>
         <p className="stat">
-          Your mark lives in this browser. Clearing your site data loses it, and
-          there is no email to recover it with — so this key is the only way it
-          survives a new phone. Written down, it is also the only way somebody
-          else could take it, so keep it the way you would keep a spare key.
+          Your mark lives on this device, and nowhere else. Want to keep it safe,
+          or carry it to a new phone? Make a key and guard it like a secret — it
+          is the only way to bring your mark back if this device is lost, and the
+          only way anyone else could take it.
         </p>
 
         {key ? (
@@ -151,16 +149,17 @@ export function MarkPage() {
                 }
               }}
             >
-              {minting ? 'Making one…' : 'Make me a key'}
+              {minting ? 'Generating…' : 'Generate my key'}
             </button>
           </div>
         )}
 
         {/* ----------------------------------------------- redeeming */}
-        <div className="review-caption">Bringing a mark to this browser</div>
+        <div className="review-caption">Link a device</div>
         <p className="stat">
-          Paste a key here and this browser becomes that same hand. The old one
-          keeps working too — a mark can be held by as many browsers as you like.
+          Already have a key? Paste it below to bring your mark to this device.
+          The old one keeps working too — a mark can live on as many devices as
+          you like.
         </p>
         <div className="row">
           <input
@@ -182,14 +181,17 @@ export function MarkPage() {
               try {
                 await redeemRecoveryKey(entry)
                 location.href = '/mark'
-              } catch (e) {
-                setError(e instanceof Error ? e.message : String(e))
+              } catch {
+                // Almost always a mistyped key rather than anything the person
+                // could otherwise act on, so the message names the likely fix
+                // instead of the raw failure.
+                setError('We don’t recognise this key. Double-check it and try again.')
               } finally {
                 setRedeeming(false)
               }
             }}
           >
-            {redeeming ? 'Checking…' : 'Use this key'}
+            {redeeming ? 'Linking…' : 'Link device'}
           </button>
         </div>
 
@@ -232,11 +234,11 @@ export function MarkPage() {
         )}
 
         {/* --------------------------------------------------- push */}
-        <div className="review-caption">Being told</div>
+        <div className="review-caption">Notifications</div>
         <p className="stat">
-          Two things, and nothing else: somebody added to a canvas you are on,
-          and a canvas you are on finished. No reminders, no digests, no nudges
-          to come back.
+          We keep it simple. You will only hear from us when a canvas you are on
+          gets a new hand, or when one you are on is finished. No spam, no
+          streaks, no nudges to come back.
         </p>
         <div className="row">
           {push === 'unsupported' && (
@@ -259,7 +261,7 @@ export function MarkPage() {
                 setPush(await pushState())
               }}
             >
-              Stop telling me
+              Turn them off
             </button>
           )}
           {push === 'off' && (
@@ -276,7 +278,7 @@ export function MarkPage() {
                 setPush(await pushState())
               }}
             >
-              Tell me when it closes
+              Turn on notifications
             </button>
           )}
         </div>
@@ -291,9 +293,9 @@ export function MarkPage() {
             screen for something most people will never tap. */}
         <h2 className="sub">A classroom</h2>
         <p className="stat">
-          A private canvas for a group in a room together, joined with a code
-          read off a board. No accounts for anyone, and nothing a class makes
-          appears in the gallery.
+          Draw together, privately. Enter a code to join a shared canvas with
+          friends, family, or classmates. What you make here stays here — it
+          never appears in the public gallery.
         </p>
         <div className="row">
           <a className="linkbtn" href="/class">

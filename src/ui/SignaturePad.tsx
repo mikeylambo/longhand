@@ -56,11 +56,14 @@ export function SignaturePad({ onDone }: Props) {
           child will scribble happily and read nothing, and that is the right
           instinct here. The mark is the whole identity: it is how a part of a
           drawing gets known as yours, and it asks nothing about who you are. */}
-      <p>Draw your mark — your initials, a squiggle, any shape you like.</p>
+      <p>
+        Draw a symbol to stand for you — your initials, a doodle, any shape you
+        like.
+      </p>
       <p className="stat">
-        It goes on everything you draw here, so people can tell which parts are
-        yours. No username, nothing to spell — your mark is your name, and it is
-        not asking who you are.
+        This is your only identity here. No passwords, no profiles — just a
+        stamp that follows you onto every canvas, showing exactly where you left
+        your touch.
       </p>
 
       <div className="sigbox" ref={hostRef}>

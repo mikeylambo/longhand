@@ -157,7 +157,7 @@ test('a submitted turn leaves no draft behind', async ({ page }) => {
   await page.getByRole('button', { name: 'Finish' }).click()
 
   // The review screen is the proof the submit went through.
-  await expect(page.getByRole('heading', { name: /yours is on it|that closed it/i }))
+  await expect(page.getByRole('heading', { name: /yours is on it|canvas complete/i }))
     .toBeVisible({ timeout: 10_000 })
 
   expect(

@@ -87,7 +87,14 @@ export function ClassPage() {
                 // so the ordinary drawing screen picks it up on load.
                 location.href = '/'
               } catch (e) {
-                setError(e instanceof Error ? e.message : String(e))
+                // Name the fix, not the raised error. The two the join actually
+                // hits are a wrong code and a class whose canvases are all busy.
+                const msg = e instanceof Error ? e.message : ''
+                setError(
+                  /free place|free slot/i.test(msg)
+                    ? 'Every canvas in this class is busy right now — hold tight, a place will open up.'
+                    : 'No canvas found under this code. Double-check it and try again.',
+                )
               } finally {
                 setBusy(false)
               }

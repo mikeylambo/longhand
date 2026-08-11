@@ -45,8 +45,8 @@ test.describe('the first visit', () => {
 
     // The rule stated before they draw, framed as a promise — and in words a
     // child reads as easily as the person who came here on purpose.
-    await expect(page.getByText(/never rub any of it out/i)).toBeVisible()
-    await expect(page.getByText(/so does everyone else/i)).toBeVisible()
+    await expect(page.getByText(/never erase/i)).toBeVisible()
+    await expect(page.getByText(/happy accidents/i)).toBeVisible()
 
     // And the timer explained once, as room rather than as a countdown.
     await expect(page.getByText(/time to think, not a race/i)).toBeVisible()
@@ -67,11 +67,10 @@ test.describe('the first visit', () => {
     await page.getByRole('button', { name: 'Add yours' }).click()
 
     await expect(page.getByRole('heading', { name: 'Your mark' })).toBeVisible()
-    // It leads with the doing — draw a squiggle — and only then says what the
+    // It leads with the doing — draw a symbol — and only then says what the
     // mark is for, so it reads as an invitation rather than as a form.
-    await expect(page.getByText(/draw your mark/i)).toBeVisible()
-    await expect(page.getByText(/your mark is your name/i)).toBeVisible()
-    await expect(page.getByText(/not asking who you are/i)).toBeVisible()
+    await expect(page.getByText(/draw a symbol to stand for you/i)).toBeVisible()
+    await expect(page.getByText(/only identity here/i)).toBeVisible()
 
     // The box says it is for drawing in, for somebody who would not otherwise
     // know a blank rectangle was theirs to touch. Exact, because the paragraph

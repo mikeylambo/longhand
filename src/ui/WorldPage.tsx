@@ -51,8 +51,9 @@ export function WorldPage() {
     <div className="panel wide">
       <h1>The world</h1>
       <p>
-        Every finished canvas, where it closed. Nothing here can be drawn on
-        again — this is a map of things that are done.
+        Art happens everywhere. This map shows where every canvas reached its
+        final stroke. Open a drawing and you can pin its place, then watch it
+        land here when it is done.
       </p>
 
       <div className="scroll">

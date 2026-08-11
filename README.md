@@ -389,15 +389,17 @@ the screen that asks for it.
 The words have one reader who is two people at once: a child who has picked up
 a parent's phone, and someone who arrived on purpose. Both have to feel
 welcome, which rules out two temptations — prose that reads like museum wall
-text, and prose that talks down. So the register is concrete and spare:
-*one drawing, lots of hands*, not *one sheet, passed between strangers*;
-*nothing rubs out*, not *ink only*; a turn that *passes to whoever is next*,
-not a slot that *goes back to the pool*. The clip carries the concept — a
-drawing building itself has no reading age — and the words only have to stay
-out of its way. The signature screen leads with the doing, *draw your mark, a
-squiggle, any shape*, because a child will scribble happily and read nothing,
-and the box says **draw here** so that a blank rectangle is legibly theirs to
-touch; the reason it exists comes second, for whoever wants it.
+text, and prose that talks down. So the register is concrete, spare, and a
+little celebratory: *One canvas, many hands*, not *one sheet, passed between
+strangers*; *Permanent ink — embrace the happy accidents*, not *ink only*; a
+turn you *pass right to the next artist*, not a slot that *goes back to the
+pool*. The clip carries the concept — a drawing building itself has no reading
+age — and the words only have to stay out of its way. The signature screen
+leads with the doing, *draw a symbol to stand for you — a doodle, any shape*,
+because a child will scribble happily and read nothing, and the box says
+**draw here** so that a blank rectangle is legibly theirs to touch; that the
+mark is *a stamp that follows you onto every canvas* comes second, for whoever
+wants it.
 
 No tutorial, no carousel, no dismissible tips over the sheet. If it takes more
 than one screen the product is the problem, and a longer explanation only hides
@@ -1399,9 +1401,21 @@ is.
 Verified by rendering a real finished canvas — twelve hands, a harbour — through
 the exact `decodeLayer`/`drawLayers` path this ships, and against a synthetic
 layer exercising the wash's multiply and the fill's even-odd holes, which are
-the two things a naive rasteriser gets wrong. The native module's behaviour on
-Vercel is the one thing no local run can prove, so it is confirmed against the
-live endpoint on deploy rather than trusted.
+the two things a naive rasteriser gets wrong.
+
+The first deploy failed, and not where expected. The native module loaded fine;
+what threw was module resolution. `package.json` is `"type": "module"`, so
+Vercel runs the compiled `api/og.js` under Node's native ESM loader, which
+refuses a relative import with no extension. tsc, Vite and esbuild all accept
+`../src/engine/render`; Node does not, and Vercel transpiles these files rather
+than bundling them, so the extensionless specifier reached production and threw
+`ERR_MODULE_NOT_FOUND` on the first request — a build that went green and a
+function that could not import itself. The fix is `.js` on the function's
+relative imports, and on the one transitive import `render.ts` pulls in
+(`../config`), because the compiled files are `.js` and that is what the
+specifier must name. Proved before the second deploy by emitting the function to
+plain JavaScript and loading it under `node` directly, which is the loader
+Vercel uses and the one tsc and Vite do not.
 
 ## Not built yet
 

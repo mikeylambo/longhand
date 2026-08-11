@@ -416,10 +416,10 @@ export function DrawTurn({
         {expired && (
           <div className="expired">
             <div>
-              <strong>Your turn ran out.</strong>
+              <strong>Time’s up for this turn.</strong>
               <p>
-                The slot has gone back to the pool for someone else. Nothing you
-                drew was saved.
+                The slot goes back for the next artist, so nothing you drew here
+                was saved. A fresh one is yours whenever you are ready.
               </p>
               <button className="linkbtn solid" onClick={onExpired}>
                 Take another slot

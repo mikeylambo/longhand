@@ -144,7 +144,7 @@ test('each lesson is shown once, and never on a later turn', async ({ page }) =>
   await pointer(page, 12)
   await page.getByRole('button', { name: 'Finish' }).click()
   await expect(
-    page.getByRole('heading', { name: /yours is on it|that closed it/i }),
+    page.getByRole('heading', { name: /yours is on it|canvas complete/i }),
   ).toBeVisible({ timeout: 10_000 })
 
   const stored = await page.evaluate((k) => localStorage.getItem(k), KEY)
