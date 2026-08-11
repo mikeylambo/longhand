@@ -43,12 +43,13 @@ test.describe('the first visit', () => {
     })
     expect(drawn, 'the clip is one flat colour — nothing was painted').toBeGreaterThan(3)
 
-    // The rule stated before they draw, framed as a promise.
-    await expect(page.getByText(/nothing you add can be removed/i)).toBeVisible()
-    await expect(page.getByText(/nothing you add can remove anyone else/i)).toBeVisible()
+    // The rule stated before they draw, framed as a promise — and in words a
+    // child reads as easily as the person who came here on purpose.
+    await expect(page.getByText(/never rub any of it out/i)).toBeVisible()
+    await expect(page.getByText(/so does everyone else/i)).toBeVisible()
 
     // And the timer explained once, as room rather than as a countdown.
-    await expect(page.getByText(/room to think, not a countdown/i)).toBeVisible()
+    await expect(page.getByText(/time to think, not a race/i)).toBeVisible()
 
     // One way forward, on screen without scrolling.
     const cta = page.getByRole('button', { name: 'Add yours' })
@@ -66,10 +67,16 @@ test.describe('the first visit', () => {
     await page.getByRole('button', { name: 'Add yours' }).click()
 
     await expect(page.getByRole('heading', { name: 'Your mark' })).toBeVisible()
-    // It used to explain the mechanics and not the point, which made it read
-    // as a form standing between a stranger and the drawing.
-    await expect(page.getByText(/only name you get/i)).toBeVisible()
+    // It leads with the doing — draw a squiggle — and only then says what the
+    // mark is for, so it reads as an invitation rather than as a form.
+    await expect(page.getByText(/draw your mark/i)).toBeVisible()
+    await expect(page.getByText(/your mark is your name/i)).toBeVisible()
     await expect(page.getByText(/not asking who you are/i)).toBeVisible()
+
+    // The box says it is for drawing in, for somebody who would not otherwise
+    // know a blank rectangle was theirs to touch. Exact, because the paragraph
+    // above it also contains the words "you draw here".
+    await expect(page.getByText('draw here', { exact: true })).toBeVisible()
   })
 
   test('is shown once, and never again', async ({ page }) => {

@@ -33,12 +33,15 @@ export function markWelcomed(): void {
  * layered over the sheet: if it takes more than this, the product is the
  * problem and a longer explanation only hides it.
  *
- * Everything here answers a question a stranger has before they will draw.
- * The clip answers "what is this". The ink line answers "can somebody ruin
- * what I make" — stated as a promise before they draw rather than as a warning
- * after they try. The count answers "is anyone else here". The clock line
- * answers "how much of my afternoon is this", once, gently, so that ten
- * minutes reads as room to think rather than as a countdown.
+ * It has one reader and it is two people at once: a child who has picked up a
+ * parent's phone, and someone who found this on purpose. Both have to feel
+ * welcome, so the words are concrete and short enough for the first and never
+ * so cute they talk down to the second. The clip does the real teaching —
+ * a drawing building itself needs no reading age — and the words only have to
+ * stay out of its way and answer, plainly, the three things anyone wonders
+ * before they will draw: what is this, can my part be ruined, and how long is
+ * a turn. "Strangers" and "slots" and "the pool" are gone; a picture made by
+ * lots of hands is a thing an eight-year-old can already see.
  */
 export function Welcome({ onStart }: Props) {
   const [progress, setProgress] = useState<string | null>(null)
@@ -52,7 +55,7 @@ export function Welcome({ onStart }: Props) {
         setProgress(
           c
             ? `${c.slots_filled} of ${c.slot_count} hands are already on the sheet you would join.`
-            : 'Nothing is part-finished right now, so you would open a sheet and somebody else would find it.',
+            : 'No drawing is half-finished right now — so you would start a fresh one, and someone else would find it.',
         )
       })
       .catch(() => {
@@ -68,22 +71,22 @@ export function Welcome({ onStart }: Props) {
       <div className="scroll">
         <WelcomeReel />
 
-        <h1>One sheet, passed between strangers</h1>
+        <h1>One drawing, lots of hands</h1>
         <p>
-          You take a slot on a drawing somebody else started, and somebody else
-          will finish. When the last hand lands it closes for good.
+          You add a little, then it is someone else&rsquo;s turn. When the last
+          hand finishes, the drawing is done — and it stays that way for good.
         </p>
 
         <dl className="promises">
-          <dt>Ink only</dt>
+          <dt>Nothing rubs out</dt>
           <dd>
-            Nothing you add can be removed — and nothing you add can remove
-            anyone else&rsquo;s.
+            Your part stays, and so does everyone else&rsquo;s. You can add to
+            the drawing, but you can never rub any of it out.
           </dd>
           <dt>Ten minutes</dt>
           <dd>
-            Room to think, not a countdown. Leave without finishing and the slot
-            quietly goes back to the pool.
+            Your turn lasts ten minutes — time to think, not a race. Stop early
+            and it passes to whoever is next.
           </dd>
         </dl>
 

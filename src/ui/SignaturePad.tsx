@@ -50,22 +50,24 @@ export function SignaturePad({ onDone }: Props) {
   return (
     <div className="panel">
       <h1>Your mark</h1>
-      {/* This screen used to sit between a stranger and drawing with no
-          explanation of why it was there, which made it feel like a form. It
-          is the opposite of a form: it is the only identity this product has,
-          and it is how anything you make gets credited to you. */}
-      <p>
-        Sign once, by hand. It goes on the back of every canvas you draw on and
-        it is the only name you get — there is no username here, and no way to
-        write one.
-      </p>
+      {/* A form asks you for something before it lets you in; this looks like
+          one and is the opposite of one. So it leads with the doing — draw a
+          squiggle — and only then says what the squiggle is for, because a
+          child will scribble happily and read nothing, and that is the right
+          instinct here. The mark is the whole identity: it is how a part of a
+          drawing gets known as yours, and it asks nothing about who you are. */}
+      <p>Draw your mark — your initials, a squiggle, any shape you like.</p>
       <p className="stat">
-        Anything at all: initials, a squiggle, a shape. Nobody is checking it
-        against anything, and it is not asking who you are.
+        It goes on everything you draw here, so people can tell which parts are
+        yours. No username, nothing to spell — your mark is your name, and it is
+        not asking who you are.
       </p>
 
       <div className="sigbox" ref={hostRef}>
         <div className="sigline" />
+        {/* A child needs to know the box is theirs to draw in. Gone the instant
+            the first stroke lands, and never in the way of it. */}
+        {count === 0 && <span className="sighint">draw here</span>}
       </div>
 
       {/* The actions belong at the bottom of the screen, not floating under

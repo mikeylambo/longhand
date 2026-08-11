@@ -386,6 +386,19 @@ would join" — answers whether anyone else is here. The clock is explained once
 gently, so ten minutes reads as room to think. The signature gets its reason on
 the screen that asks for it.
 
+The words have one reader who is two people at once: a child who has picked up
+a parent's phone, and someone who arrived on purpose. Both have to feel
+welcome, which rules out two temptations — prose that reads like museum wall
+text, and prose that talks down. So the register is concrete and spare:
+*one drawing, lots of hands*, not *one sheet, passed between strangers*;
+*nothing rubs out*, not *ink only*; a turn that *passes to whoever is next*,
+not a slot that *goes back to the pool*. The clip carries the concept — a
+drawing building itself has no reading age — and the words only have to stay
+out of its way. The signature screen leads with the doing, *draw your mark, a
+squiggle, any shape*, because a child will scribble happily and read nothing,
+and the box says **draw here** so that a blank rectangle is legibly theirs to
+touch; the reason it exists comes second, for whoever wants it.
+
 No tutorial, no carousel, no dismissible tips over the sheet. If it takes more
 than one screen the product is the problem, and a longer explanation only hides
 that.

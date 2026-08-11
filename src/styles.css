@@ -582,6 +582,24 @@ button {
   pointer-events: none;
 }
 
+/* Sits just above the line so a child knows the box is theirs to draw in.
+   Faint enough to read as a placeholder rather than as content, and removed
+   from the DOM the instant a stroke lands. */
+.sighint {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  right: 0;
+  bottom: 30%;
+  text-align: center;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 .row {
   display: flex;
   gap: 10px;
