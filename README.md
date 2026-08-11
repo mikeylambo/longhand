@@ -1417,17 +1417,26 @@ specifier must name. Proved before the second deploy by emitting the function to
 plain JavaScript and loading it under `node` directly, which is the loader
 Vercel uses and the one tsc and Vite do not.
 
-The second deploy surfaced the second Node-versus-edge difference. `api/canvas.ts`
-is an edge function, where `request.url` is absolute; `api/og.ts` is a Node
-function, where it is the path alone, so `new URL(request.url)` threw
-`Invalid URL` on every request. The origin is rebuilt from the forwarded host
-instead — which is also the origin the fallback icon is fetched from, so it has
-to be the real one. This time the whole function was simulated before deploying:
-emitted, its `fetch` stubbed with a real canvas's rows, and called with a
-path-only request carrying a host header — the exact shape Vercel delivers —
-which returned a 200 image/png of the right drawing. The lesson, written down:
-a Node serverless function is not an edge function with a different `runtime`
-line, and the two places that bite are module resolution and the request.
+The later deploys surfaced the rest of the difference, and it is bigger than one
+line. `api/canvas.ts` is an edge function; `api/og.ts`, forced onto the Node
+runtime by the native rasteriser, is not a web handler at all but a classic Node
+`(req, res)` function — and three assumptions carried over from the edge were
+each wrong. `req.url` is the path alone, not an absolute URL, so
+`new URL(req.url)` threw `Invalid URL`; the origin is rebuilt from the forwarded
+host instead — which is also where the fallback icon is fetched from, so it has
+to be the real one. `req.headers` is a plain object, not a `Headers`, so
+`.get()` threw `is not a function`. And the reply is written to `res`, not
+returned as a `Response`, so a returned one is simply ignored. Each cost a
+deploy to find, because each hid behind the one before it.
+
+The last version was simulated the way it is actually called before it went out:
+emitted to plain JS, its `fetch` stubbed with a real canvas's rows, and invoked
+with a path-only `req`, a plain-object `headers`, and a mock `res` — the exact
+shape Vercel's Node runtime delivers — which wrote a 200 image/png of the right
+drawing with an immutable cache header. The lesson, written down: a Node
+serverless function is not an edge function with a different `runtime` line. It
+takes a Node request and a Node response, and the three that bite are the URL,
+the headers, and how you reply.
 
 ## Not built yet
 
