@@ -13,6 +13,7 @@ import { ClassPage } from './ui/ClassPage'
 import { DOCS } from './content/legal'
 import { SelfTestPage } from './dev/SelfTestPage'
 import { Router } from './ui/Router'
+import { OfflineBanner } from './ui/OfflineBanner'
 import { whenSplashClear } from './ui/boot'
 import './styles.css'
 
@@ -61,6 +62,7 @@ function route(rawPath: string): ReactNode {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
+    <OfflineBanner />
     <Router render={route} />
   </StrictMode>,
 )

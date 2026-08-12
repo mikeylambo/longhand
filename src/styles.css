@@ -21,6 +21,12 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  /* This is a fixed shell — every screen scrolls its own content in an inner
+     column, so the page itself must never scroll sideways. Without this a
+     single too-wide element anywhere turns the whole app into something you
+     drag left and right, which reads as broken in standalone mode where there
+     is no browser chrome to hide it. */
+  overflow-x: hidden;
 }
 
 body {
@@ -31,6 +37,23 @@ body {
   -webkit-user-select: none;
   user-select: none;
   -webkit-text-size-adjust: 100%;
+}
+
+/* The connection dropped. A quiet strip above everything but the splash, so a
+   Finish that does nothing and a sheet that will not load have a reason on
+   screen. Nothing is lost while it shows — the draft is saved locally. */
+.offline {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9998;
+  padding: calc(var(--safe-t) + 7px) 14px 7px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  text-align: center;
 }
 
 button {
